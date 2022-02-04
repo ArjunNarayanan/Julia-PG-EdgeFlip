@@ -1,8 +1,11 @@
 using Flux
+using Distributions: Categorical
 using EdgeFlip
 import EdgeFlip: state, step!, is_terminated, reward, reset!
 using Printf
 include("global_policy_gradient.jl")
+
+
 
 struct Policy
     model::Any
@@ -71,46 +74,26 @@ function render_policy(env, policy; pause = 0.5, maxsteps = 20, filename = "")
     end
 end
 
-function single_trajectory_average_return(env, policy; maxsteps = 20)
-    reset!(env)
-    ep_returns = []
-    counter = 1
-    done = is_terminated(env)
-    while !done && counter <= maxsteps
-        action = env |> state |> policy |> softmax |> Categorical |> rand
-        step!(env, action)
-        push!(ep_returns, reward(env))
-        done = is_terminated(env)
-        counter += 1
-    end
-    return sum(ep_returns)
-end
-
-function average_returns(env, policy; num_trajectories = 100)
-    ret = []
-    for counter in 1:num_trajectories
-        push!(ret, single_trajectory_average_return(env, policy))
-    end
-    return sum(ret) / length(ret)
-end
 
 learning_rate = 0.1
-batch_size = 20
-num_epochs = 5000
+batch_size = 100
+num_epochs = 1000
+maxsteps = 20
+num_trajectories = 100
 
-env = EdgeFlip.GameEnv(1, 5, fixed_reset = false)
-# EdgeFlip.render(env)[1]
+env = EdgeFlip.GameEnv(2, maxsteps, fixed_reset = true)
+EdgeFlip.render(env)[1]
 
-policy = Policy(Dense(4, 1))
-loss_history, return_history = run_training_loop(env, policy, batch_size, num_epochs, learning_rate)
+policy = Policy(Chain(Dense(4, 4, relu),Dense(4,1)))
+loss_history, return_history = PolicyGradient.run_training_loop(env, policy, batch_size, num_epochs, learning_rate, maxsteps, num_trajectories, estimate_every=100)
 
 
 using PyPlot
 reset!(env)
 optimum = env.score
-ret = average_returns(env, policy)
-# fig = plot_history(return_history,title="Average reward vs Epochs")
+# ret = average_returns(env, policy)
+# fig = plot_history(return_history,optimum=optimum,title="Average reward vs Epochs")
 
 pygui(true)
 reset!(env)
-render_policy(env, policy, filename = "results/fixed-initial-state-anim/fixed-initial-state")
+render_policy(env, policy)
