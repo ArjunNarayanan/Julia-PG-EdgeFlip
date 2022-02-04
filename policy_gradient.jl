@@ -1,3 +1,5 @@
+module PolicyGradient
+
 using Flux
 using Distributions: Categorical
 using Printf
@@ -74,15 +76,38 @@ function step_epoch(env, policy, optimizer, batch_size)
     return loss, avg_return
 end
 
-function run_training_loop(env, policy, batch_size, num_epochs, learning_rate)
+
+function single_trajectory_average_return(env, policy, maxsteps)
+    reset!(env)
+    ep_returns = []
+    counter = 1
+    done = is_terminated(env)
+    while !done && counter <= maxsteps
+        action = env |> state |> policy |> softmax |> Categorical |> rand
+        step!(env, action)
+        push!(ep_returns, reward(env))
+        done = is_terminated(env)
+        counter += 1
+    end
+    return sum(ep_returns)
+end
+
+function average_returns(env, policy, maxsteps, num_trajectories)
+    ret = [single_trajectory_average_return(env,policy,maxsteps) for i in 1:num_trajectories]
+    return sum(ret) / length(ret)
+end
+
+function run_training_loop(env, policy, batch_size, num_epochs, learning_rate, maxsteps, num_trajectories)
     optimizer = ADAM(learning_rate)
     return_history = []
     loss_history = []
 
     for epoch = 1:num_epochs
         loss, avg_return = step_epoch(env, policy, optimizer, batch_size)
-        append!(return_history, avg_return)
         append!(loss_history, loss)
+
+        avg_return = average_returns(env,policy,maxsteps,num_trajectories)
+        append!(return_history, avg_return)
 
         statement =
             @sprintf "epoch: %3d \t loss: %.4f \t avg return: %3.2f" epoch loss avg_return
@@ -90,3 +115,8 @@ function run_training_loop(env, policy, batch_size, num_epochs, learning_rate)
     end
     return loss_history, return_history
 end
+
+
+# end module
+end
+# end module
