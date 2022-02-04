@@ -3,7 +3,7 @@ function env_score(vs)
 end
 
 mutable struct TemplateEnv
-    vertex_score::Any
+    state::Any
     score::Any
     reward::Any
     is_terminated::Any
@@ -20,8 +20,8 @@ function TemplateEnv()
 end
 
 function reset!(env::TemplateEnv)
-    env.vertex_score = rand([-1, 0, 1], 4)
-    env.score = env_score(env.vertex_score)
+    env.state = rand([-1, 0, 1], 4)
+    env.score = env_score(env.state)
     env.reward = 0.0
     env.is_terminated = false
 end
@@ -32,10 +32,10 @@ function step!(env::TemplateEnv, action; no_flip_reward = 0.0)
         env.is_terminated = true
     elseif action == 2
         old_score = env.score
-        vs = env.vertex_score + [-1, -1, 1, 1]
+        vs = env.state + [-1, -1, 1, 1]
         new_score = env_score(vs)
 
-        env.vertex_score = vs
+        env.state = vs
         env.score = new_score
         env.reward = old_score - new_score
         env.is_terminated = true
@@ -43,7 +43,7 @@ function step!(env::TemplateEnv, action; no_flip_reward = 0.0)
 end
 
 function state(env::TemplateEnv)
-    return env.vertex_score
+    return env.state
 end
 
 function reward(env::TemplateEnv)

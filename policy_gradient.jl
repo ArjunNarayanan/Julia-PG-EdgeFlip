@@ -1,9 +1,3 @@
-module PolicyGradient
-
-using Flux
-using Distributions: Categorical
-using Printf
-
 function policy_gradient_loss(states, policy, actions, weights)
     logp = logsoftmax(policy(states), dims = 1)
     logp = -[logp[actions[i], i] for i = 1:length(actions)]
@@ -115,8 +109,3 @@ function run_training_loop(env, policy, batch_size, num_epochs, learning_rate, m
     end
     return loss_history, return_history
 end
-
-
-# end module
-end
-# end module
