@@ -1,9 +1,10 @@
 module PolicyGradient
 
-using EdgeFlip: state, step!, reward, is_terminated, reset!
+using EdgeFlip: state, step!, reward, is_terminated, reset!, score
 using Flux
 using Distributions: Categorical
 using Printf
+using Statistics
 
 function policy_gradient_loss(states, policy, actions, weights)
     logp = logsoftmax.(policy.(states))
@@ -77,8 +78,9 @@ function step_epoch(env, policy, optimizer, batch_size)
 end
 
 
-function single_trajectory_average_return(env, policy, maxsteps)
+function single_trajectory_normalized_return(env, policy, maxsteps)
     reset!(env)
+    maxscore = score(env)
     ep_returns = []
     counter = 1
     done = is_terminated(env)
@@ -89,15 +91,33 @@ function single_trajectory_average_return(env, policy, maxsteps)
         done = is_terminated(env)
         counter += 1
     end
-    return sum(ep_returns)
+    return sum(ep_returns)/maxscore
 end
 
 function average_returns(env, policy, maxsteps, num_trajectories)
-    ret = [single_trajectory_average_return(env,policy,maxsteps) for i in 1:num_trajectories]
+    ret =
+        [single_trajectory_normalized_return(env, policy, maxsteps) for i = 1:num_trajectories]
     return sum(ret) / length(ret)
 end
 
-function run_training_loop(env, policy, batch_size, num_epochs, learning_rate, maxsteps, num_trajectories; estimate_every=10)
+function mean_and_std_returns(env,policy,maxsteps,num_trajectories)
+    ret =
+        [single_trajectory_normalized_return(env, policy, maxsteps) for i = 1:num_trajectories]
+    avg = mean(ret)
+    dev = std(ret)
+    return avg, dev
+end
+
+function run_training_loop(
+    env,
+    policy,
+    batch_size,
+    num_epochs,
+    learning_rate,
+    maxsteps,
+    num_trajectories;
+    estimate_every = 10,
+)
     optimizer = ADAM(learning_rate)
     return_history = []
     epoch_history = []
@@ -105,12 +125,12 @@ function run_training_loop(env, policy, batch_size, num_epochs, learning_rate, m
     for epoch = 1:num_epochs
         loss, avg_return = step_epoch(env, policy, optimizer, batch_size)
 
-        if epoch%estimate_every == 0
-            avg_return = average_returns(env,policy,maxsteps,num_trajectories)
+        if epoch % estimate_every == 0
+            avg_return = average_returns(env, policy, maxsteps, num_trajectories)
             append!(return_history, avg_return)
-            append!(epoch_history,epoch)
+            append!(epoch_history, epoch)
             statement =
-            @sprintf "epoch: %3d \t loss: %.4f \t avg return: %3.2f" epoch loss avg_return
+                @sprintf "epoch: %3d \t loss: %.4f \t avg return: %3.2f" epoch loss avg_return
             println(statement)
         end
     end
