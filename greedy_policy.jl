@@ -6,9 +6,9 @@ using Distributions: Categorical
 using Statistics
 
 function greedy_action(env)
-    num_actions = EdgeFlip.number_of_edges(env.mesh)
     it,j = EdgeFlip.greedy_action(env)
-    action = env.mesh.t2e[it,j]
+    edgeid = env.mesh.t2e[it,j]
+    action = env.edge_to_active_edge[edgeid]
     return action
 end
 
@@ -18,14 +18,18 @@ function single_trajectory_normalized_return(env, maxsteps)
     ep_returns = []
     counter = 1
     done = is_terminated(env)
-    while !done && counter <= maxsteps
-        action = greedy_action(env)
-        step!(env, action)
-        push!(ep_returns, reward(env))
-        done = is_terminated(env)
-        counter += 1
+    if done
+        return 1.0
+    else
+        while !done && counter <= maxsteps
+            action = greedy_action(env)
+            step!(env, action)
+            push!(ep_returns, reward(env))
+            done = is_terminated(env)
+            counter += 1
+        end
+        return sum(ep_returns)/maxscore
     end
-    return sum(ep_returns)/maxscore
 end
 
 function mean_and_std_returns(env,maxsteps,num_trajectories)

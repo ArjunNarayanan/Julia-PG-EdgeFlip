@@ -35,7 +35,7 @@ maxsteps = ceil(Int, 1.2nflips)
 num_trajectories = 100
 
 
-# policy = Policy(Dense(4, 1))
+policy = Policy(Dense(4, 1))
 # policy = Policy(Chain(Dense(4, 4, relu), Dense(4, 4, relu), Dense(4, 1)))
 
 
@@ -56,16 +56,16 @@ nn_avg, nn_dev =
     PolicyGradient.mean_and_std_returns(env, policy, maxsteps, num_test_trajectories)
 greedy_avg, greedy_dev =
     GreedyPolicy.mean_and_std_returns(env, maxsteps, num_test_trajectories)
-@printf "NN MEAN : %2.3f \t NN DEV : %2.3f" nn_avg nn_dev
-@printf "GD MEAN : %2.3f \t GD DEV : %2.3f" greedy_avg greedy_dev
+@printf "NN MEAN : %2.3f \t NN DEV : %2.3f\n" nn_avg nn_dev
+@printf "GD MEAN : %2.3f \t GD DEV : %2.3f\n" greedy_avg greedy_dev
 
 
-reset!(env)
-trial_num = 1
-gd_env = deepcopy(env)
+# reset!(env)
+# trial_num = 1
+# gd_env = deepcopy(env)
 
-filename = "results/greedy-vs-nn-anim/nref" * string(nref) * "/nn/nn" * string(trial_num)
-render_policy(env, policy, filename = filename, figsize = 7, maxsteps = maxsteps)
+# filename = "results/greedy-vs-nn-anim/nref" * string(nref) * "/nn/nn" * string(trial_num)
+# render_policy(env, policy, filename = filename, figsize = 7, maxsteps = maxsteps)
 
-filename = "results/greedy-vs-nn-anim/nref" * string(nref) * "/gd/gd" * string(trial_num)
-render_policy(gd_env, filename = filename, figsize = 7, maxsteps = maxsteps)
+# filename = "results/greedy-vs-nn-anim/nref" * string(nref) * "/gd/gd" * string(trial_num)
+# render_policy(gd_env, filename = filename, figsize = 7, maxsteps = maxsteps)

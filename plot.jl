@@ -77,3 +77,17 @@ function render_policy(env; pause = 0.5, maxsteps = 20, filename = "", figsize =
         fig.savefig(savepath)
     end
 end
+
+function plot_returns(nflips,ret,dev;filename="",ylim=(0.75,1.0))
+    fig,ax = subplots()
+    ax.plot(nflips,ret)
+    ax.fill_between(nflips,ret+dev,ret-dev,alpha=0.2,facecolor="blue")
+    ax.set_xlabel("Normalized number of random initial flips")
+    ax.set_ylabel("Normalized returns")
+    ax.set_title("Normalized returns vs initial flips for greedy algorithm")
+    ax.set_ylim(ylim)
+    if length(filename) > 0
+        fig.savefig(filename)
+    end
+    return fig
+end
