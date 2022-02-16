@@ -1,5 +1,6 @@
 using PyPlot
 pygui(true)
+using MeshPlotter
 
 function plot_history(history; optimum = nothing, title = "", filename = "")
     fig, ax = subplots()
@@ -25,7 +26,7 @@ function render_policy(env, policy; pause = 0.5, maxsteps = 20, filename = "", f
     counter = 1
     while !done && counter < maxsteps
         EdgeFlip.averagesmoothing!(env.mesh, 3)
-        EdgeFlip.plot!(ax, env.mesh, d0 = env.d0)
+        MeshPlotter.plot!(ax, env.mesh, d0 = env.d0)
 
         sleep(pause)
         action = env |> state |> policy |> softmax |> Categorical |> rand
@@ -40,7 +41,7 @@ function render_policy(env, policy; pause = 0.5, maxsteps = 20, filename = "", f
         counter += 1
     end
     EdgeFlip.averagesmoothing!(env.mesh, 3)
-    EdgeFlip.plot!(ax, env.mesh, d0 = env.d0)
+    MeshPlotter.plot!(ax, env.mesh, d0 = env.d0)
 
     if length(filename) > 0
         savepath = filename * "-" * lpad(counter, 2, "0") * ".png"
@@ -51,11 +52,11 @@ end
 function render_policy(env; pause = 0.5, maxsteps = 20, filename = "", figsize = 10)
     fig, ax = subplots(figsize = (figsize, figsize))
     done = is_terminated(env)
-    EdgeFlip.plot!(ax, env.mesh, d0 = env.d0)
+    MeshPlotter.plot_mesh!(ax, env.mesh, d0 = env.d0)
     counter = 1
     while !done && counter < maxsteps
         EdgeFlip.averagesmoothing!(env.mesh, 3)
-        EdgeFlip.plot!(ax, env.mesh, d0 = env.d0)
+        MeshPlotter.plot_mesh!(ax, env.mesh, d0 = env.d0)
 
         sleep(pause)
         action = GreedyPolicy.greedy_action(env)
@@ -70,7 +71,7 @@ function render_policy(env; pause = 0.5, maxsteps = 20, filename = "", figsize =
         counter += 1
     end
     EdgeFlip.averagesmoothing!(env.mesh, 3)
-    EdgeFlip.plot!(ax, env.mesh, d0 = env.d0)
+    MeshPlotter.plot_mesh!(ax, env.mesh, d0 = env.d0)
 
     if length(filename) > 0
         savepath = filename * "-" * lpad(counter, 2, "0") * ".png"

@@ -84,14 +84,18 @@ function single_trajectory_normalized_return(env, policy, maxsteps)
     ep_returns = []
     counter = 1
     done = is_terminated(env)
-    while !done && counter <= maxsteps
-        action = env |> state |> policy |> softmax |> Categorical |> rand
-        step!(env, action)
-        push!(ep_returns, reward(env))
-        done = is_terminated(env)
-        counter += 1
+    if done
+        return 1.0
+    else
+        while !done && counter <= maxsteps
+            action = env |> state |> policy |> softmax |> Categorical |> rand
+            step!(env, action)
+            push!(ep_returns, reward(env))
+            done = is_terminated(env)
+            counter += 1
+        end
+        return sum(ep_returns)/maxscore
     end
-    return sum(ep_returns)/maxscore
 end
 
 function average_returns(env, policy, maxsteps, num_trajectories)

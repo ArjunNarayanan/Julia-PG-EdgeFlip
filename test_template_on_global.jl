@@ -29,14 +29,14 @@ env = EdgeFlip.GameEnv(nref, nflips, fixed_reset = false)
 
 
 learning_rate = 0.1
-batch_size = 100
-num_epochs = 1000
+batch_size = 32
+num_epochs = 5000
 maxsteps = ceil(Int, 1.2nflips)
 num_trajectories = 100
 
 
 policy = Policy(Dense(4, 1))
-# policy = Policy(Chain(Dense(4, 4, relu), Dense(4, 4, relu), Dense(4, 1)))
+# policy = Policy(Chain(Dense(4, 4, relu), Dense(4, 1)))
 
 
 epoch_history, return_history = PolicyGradient.run_training_loop(
@@ -60,12 +60,12 @@ greedy_avg, greedy_dev =
 @printf "GD MEAN : %2.3f \t GD DEV : %2.3f\n" greedy_avg greedy_dev
 
 
-# reset!(env)
+reset!(env)
 # trial_num = 1
-# gd_env = deepcopy(env)
+gd_env = deepcopy(env)
 
 # filename = "results/greedy-vs-nn-anim/nref" * string(nref) * "/nn/nn" * string(trial_num)
 # render_policy(env, policy, filename = filename, figsize = 7, maxsteps = maxsteps)
 
 # filename = "results/greedy-vs-nn-anim/nref" * string(nref) * "/gd/gd" * string(trial_num)
-# render_policy(gd_env, filename = filename, figsize = 7, maxsteps = maxsteps)
+render_policy(gd_env, figsize = 7, maxsteps = maxsteps)
