@@ -1,12 +1,35 @@
 using Flux
 using Distributions: Categorical
 using EdgeFlip
-import EdgeFlip: state, step!, is_terminated, reward, reset!
+# import EdgeFlip: state, step!, is_terminated, reward, reset!
 using Printf
 include("global_policy_gradient.jl")
 include("greedy_policy.jl")
 include("plot.jl")
 
+function PolicyGradient.state(env::EdgeFlip.GameEnv)
+    return EdgeFlip.vertex_template_score(env)
+end
+
+function PolicyGradient.step!(env::EdgeFlip.GameEnv, action)
+    EdgeFlip.step!(env, action)
+end
+
+function PolicyGradient.is_terminated(env::EdgeFlip.GameEnv)
+    return EdgeFlip.is_terminated(env)
+end
+
+function PolicyGradient.reward(env::EdgeFlip.GameEnv)
+    return EdgeFlip.reward(env)
+end
+
+function PolicyGradient.reset!(env::EdgeFlip.GameEnv)
+    EdgeFlip.reset!(env)
+end
+
+function PolicyGradient.score(env::EdgeFlip.GameEnv)
+    return EdgeFlip.score(env)
+end
 
 struct Policy
     model::Any
@@ -15,30 +38,27 @@ struct Policy
     end
 end
 
-# function Flux.params(p::Policy)
-#     return params(p.model)
-# end
-
 function (p::Policy)(s)
     return vec(p.model(s))
 end
 
 Flux.@functor Policy
 
-nref = 2
-nflips = 20
+nref = 1
+nflips = 5
 env = EdgeFlip.GameEnv(nref, nflips, fixed_reset = false)
 
 
 learning_rate = 0.1
 batch_size = 32
-num_epochs = 5000
+num_epochs = 1000
 maxsteps = ceil(Int, 1.2nflips)
 num_trajectories = 100
 
 
 policy = Policy(Dense(4, 1))
 # policy = Policy(Chain(Dense(4, 4, relu), Dense(4, 1)))
+
 
 
 epoch_history, return_history = PolicyGradient.run_training_loop(
@@ -53,13 +73,13 @@ epoch_history, return_history = PolicyGradient.run_training_loop(
 )
 
 
-# num_test_trajectories = 1000
-# nn_avg, nn_dev =
-#     PolicyGradient.mean_and_std_returns(env, policy, maxsteps, num_test_trajectories)
-# greedy_avg, greedy_dev =
-#     GreedyPolicy.mean_and_std_returns(env, maxsteps, num_test_trajectories)
-# @printf "NN MEAN : %2.3f \t NN DEV : %2.3f\n" nn_avg nn_dev
-# @printf "GD MEAN : %2.3f \t GD DEV : %2.3f\n" greedy_avg greedy_dev
+num_test_trajectories = 1000
+nn_avg, nn_dev =
+    PolicyGradient.mean_and_std_returns(env, policy, maxsteps, num_test_trajectories)
+greedy_avg, greedy_dev =
+    GreedyPolicy.mean_and_std_returns(env, maxsteps, num_test_trajectories)
+@printf "NN MEAN : %2.3f \t NN DEV : %2.3f\n" nn_avg nn_dev
+@printf "GD MEAN : %2.3f \t GD DEV : %2.3f\n" greedy_avg greedy_dev
 
 
 # reset!(env)

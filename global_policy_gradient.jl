@@ -1,10 +1,18 @@
 module PolicyGradient
 
-using EdgeFlip: state, step!, reward, is_terminated, reset!, score
+# using EdgeFlip: state, step!, reward, is_terminated, reset!, score
 using Flux
 using Distributions: Categorical
 using Printf
 using Statistics
+
+
+state(env) = nothing
+step!(env, action) = nothing
+reward(env) = nothing
+is_terminated(env) = nothing
+reset!(env) = nothing
+score(env) = nothing
 
 function policy_gradient_loss(states, policy, actions, weights)
     logp = logsoftmax.(policy.(states))
@@ -94,19 +102,23 @@ function single_trajectory_normalized_return(env, policy, maxsteps)
             done = is_terminated(env)
             counter += 1
         end
-        return sum(ep_returns)/maxscore
+        return sum(ep_returns) / maxscore
     end
 end
 
 function average_returns(env, policy, maxsteps, num_trajectories)
-    ret =
-        [single_trajectory_normalized_return(env, policy, maxsteps) for i = 1:num_trajectories]
+    ret = [
+        single_trajectory_normalized_return(env, policy, maxsteps) for
+        i = 1:num_trajectories
+    ]
     return sum(ret) / length(ret)
 end
 
-function mean_and_std_returns(env,policy,maxsteps,num_trajectories)
-    ret =
-        [single_trajectory_normalized_return(env, policy, maxsteps) for i = 1:num_trajectories]
+function mean_and_std_returns(env, policy, maxsteps, num_trajectories)
+    ret = [
+        single_trajectory_normalized_return(env, policy, maxsteps) for
+        i = 1:num_trajectories
+    ]
     avg = mean(ret)
     dev = std(ret)
     return avg, dev

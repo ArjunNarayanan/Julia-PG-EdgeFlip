@@ -1,6 +1,6 @@
 module GreedyPolicy
 using EdgeFlip
-using EdgeFlip: state, step!, reward, is_terminated, reset!, score
+using EdgeFlip: step!, reward, is_terminated, reset!, score
 using Flux
 using Distributions: Categorical
 using Statistics
@@ -8,8 +8,7 @@ using Statistics
 function greedy_action(env)
     it,j = EdgeFlip.greedy_action(env)
     edgeid = env.mesh.t2e[it,j]
-    action = env.edge_to_active_edge[edgeid]
-    return action
+    return edgeid
 end
 
 function single_trajectory_normalized_return(env, maxsteps)
