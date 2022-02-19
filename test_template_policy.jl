@@ -45,11 +45,11 @@ loss_history, return_history =
 
 
 greedy_optimum = 0.24691358024691357
-# fig = plot_history(
-#     return_history,
-#     optimum = greedy_optimum,
-#     # filename = "results\\template-greedy-reward-history.png",
-# )
+fig = plot_history(
+    return_history,
+    optimum = greedy_optimum,
+    # filename = "results\\template-greedy-reward-history.png",
+)
 
 performance = expected_reward(policy)
 

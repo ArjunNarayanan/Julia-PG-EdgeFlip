@@ -73,13 +73,13 @@ epoch_history, return_history = PolicyGradient.run_training_loop(
 )
 
 
-num_test_trajectories = 1000
-nn_avg, nn_dev =
-    PolicyGradient.mean_and_std_returns(env, policy, maxsteps, num_test_trajectories)
-greedy_avg, greedy_dev =
-    GreedyPolicy.mean_and_std_returns(env, maxsteps, num_test_trajectories)
-@printf "NN MEAN : %2.3f \t NN DEV : %2.3f\n" nn_avg nn_dev
-@printf "GD MEAN : %2.3f \t GD DEV : %2.3f\n" greedy_avg greedy_dev
+# num_test_trajectories = 1000
+# nn_avg, nn_dev =
+#     PolicyGradient.mean_and_std_returns(env, policy, maxsteps, num_test_trajectories)
+# greedy_avg, greedy_dev =
+#     GreedyPolicy.mean_and_std_returns(env, maxsteps, num_test_trajectories)
+# @printf "NN MEAN : %2.3f \t NN DEV : %2.3f\n" nn_avg nn_dev
+# @printf "GD MEAN : %2.3f \t GD DEV : %2.3f\n" greedy_avg greedy_dev
 
 
 # reset!(env)

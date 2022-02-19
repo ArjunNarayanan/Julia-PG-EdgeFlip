@@ -53,8 +53,11 @@ function collect_batch_trajectories(env, policy, batch_size)
         append!(ep_rewards, r)
 
         if done || length(batch_actions) >= batch_size
-            ep_ret, ep_len = sum(ep_rewards), length(ep_rewards)
-            append!(batch_weights, repeat([ep_ret], ep_len))
+            ep_ret = cumsum(reverse(ep_rewards))
+            append!(batch_weights, ep_ret)
+            # ep_ret, ep_len = sum(ep_rewards), length(ep_rewards)
+            # append!(batch_weights, repeat([ep_ret], ep_len))
+
             append!(batch_returns, ep_ret)
 
             if length(batch_actions) >= batch_size
