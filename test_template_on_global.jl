@@ -46,13 +46,13 @@ Flux.@functor Policy
 
 nref = 1
 nflips = 5
-env = EdgeFlip.GameEnv(nref, nflips, fixed_reset = false)
+maxflips = ceil(Int, 1.2nflips)
+env = EdgeFlip.GameEnv(nref, nflips, fixed_reset = false, maxflips = maxflips)
 
 
 learning_rate = 0.1
 batch_size = 32
 num_epochs = 1000
-maxsteps = ceil(Int, 1.2nflips)
 num_trajectories = 100
 
 
@@ -67,19 +67,17 @@ epoch_history, return_history = PolicyGradient.run_training_loop(
     batch_size,
     num_epochs,
     learning_rate,
-    maxsteps,
     num_trajectories,
     estimate_every = 100,
 )
 
 
-# num_test_trajectories = 1000
-# nn_avg, nn_dev =
-#     PolicyGradient.mean_and_std_returns(env, policy, maxsteps, num_test_trajectories)
-# greedy_avg, greedy_dev =
-#     GreedyPolicy.mean_and_std_returns(env, maxsteps, num_test_trajectories)
-# @printf "NN MEAN : %2.3f \t NN DEV : %2.3f\n" nn_avg nn_dev
-# @printf "GD MEAN : %2.3f \t GD DEV : %2.3f\n" greedy_avg greedy_dev
+num_test_trajectories = 1000
+nn_avg =
+    PolicyGradient.average_normalized_returns(env, policy, num_test_trajectories)
+greedy_avg = GreedyPolicy.average_normalized_returns(env, num_test_trajectories)
+@printf "NN MEAN : %2.3f\n" nn_avg
+@printf "GD MEAN : %2.3f\n" greedy_avg
 
 
 # reset!(env)

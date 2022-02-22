@@ -3,7 +3,6 @@ using Distributions: Categorical
 using EdgeFlip
 using Printf
 include("global_policy_gradient.jl")
-include("greedy_policy.jl")
 include("plot.jl")
 
 function PolicyGradient.state(env::EdgeFlip.GameEnv)
@@ -28,7 +27,7 @@ function PolicyGradient.reward(env::EdgeFlip.GameEnv)
     return EdgeFlip.reward(env)
 end
 
-function PolicyGradient.reset!(env::EdgeFlip.GameEnv)
+function PolicyGradient.reset!(env::EdgeFlip.GameEnv; vs = rand(-3:3,5))
     t = [
         1 2 5
         2 4 5
@@ -36,7 +35,6 @@ function PolicyGradient.reset!(env::EdgeFlip.GameEnv)
     ]
     p = rand(5, 2)
     mesh = EdgeFlip.Mesh(p, t)
-    vs = rand(-3:3, 5)
 
     env.mesh = mesh
     env.d0 .= mesh.d - vs
@@ -102,7 +100,8 @@ function two_edge_game_env(; vertex_score = rand(-3:3, 5))
 end
 
 policy = ExtPolicy()
-env = two_edge_game_env()
+env = two_edge_game_env(vertex_score = zeros(Int,5))
+
 
 learning_rate = 0.1
 batch_size = 32
@@ -111,10 +110,6 @@ maxsteps = 2
 num_trajectories = 100
 
 
-PolicyGradient.reset!(env)
-
-actions = EdgeFlip.all_actions(env)
-rewards = [EdgeFlip.reward(env,a) for a in actions]
-
+# PolicyGradient.reset!(env)
 # logits = policy(PolicyGradient.state(env))
 # PolicyGradient.run_training_loop(env, policy, batch_size, num_epochs, learning_rate, maxsteps, num_trajectories)

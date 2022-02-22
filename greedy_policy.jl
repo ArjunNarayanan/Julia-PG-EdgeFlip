@@ -1,39 +1,93 @@
 module GreedyPolicy
 using EdgeFlip
-using EdgeFlip: step!, reward, is_terminated, reset!, score
 using Flux
 using Distributions: Categorical
 using Statistics
 
+# dummy functions overload with your methods
+function step!(env::EdgeFlip.GameEnv, action)
+    num_actions = EdgeFlip.number_of_actions(env)
+    if 0 < action <= num_actions
+        EdgeFlip.step!(env, action)
+    else
+        EdgeFlip.step!(env)
+    end
+end
+
+function is_terminated(env::EdgeFlip.GameEnv)
+    return EdgeFlip.is_terminated(env)
+end
+
+function reward(env::EdgeFlip.GameEnv)
+    return EdgeFlip.reward(env)
+end
+
+function reset!(env::EdgeFlip.GameEnv)
+    EdgeFlip.reset!(env)
+end
+
+function score(env::EdgeFlip.GameEnv)
+    return EdgeFlip.score(env)
+end
+
 function greedy_action(env)
     it,j = EdgeFlip.greedy_action(env)
+    r = EdgeFlip.reward(env,(it,j))
+    num_actions = EdgeFlip.number_of_actions(env)
+
+    # edgeid = r < 0 ? num_actions + 1 : env.mesh.t2e[it,j]
     edgeid = env.mesh.t2e[it,j]
     return edgeid
 end
 
-function single_trajectory_normalized_return(env, maxsteps)
-    reset!(env)
-    maxscore = score(env)
+function single_trajectory_return(env)
     ep_returns = []
-    counter = 1
     done = is_terminated(env)
     if done
-        return 1.0
+        return 0.0
     else
-        while !done && counter <= maxsteps
+        while !done
             action = greedy_action(env)
             step!(env, action)
             push!(ep_returns, reward(env))
             done = is_terminated(env)
-            counter += 1
         end
-        return sum(ep_returns)/maxscore
+        return sum(ep_returns)
     end
 end
 
-function mean_and_std_returns(env,maxsteps,num_trajectories)
-    ret =
-        [single_trajectory_normalized_return(env, maxsteps) for i = 1:num_trajectories]
+function single_trajectory_normalized_return(env)
+    maxscore = score(env)
+    ret = single_trajectory_return(env)
+    return ret/maxscore
+end
+
+function average_normalized_returns(env, num_trajectories)
+    ret = zeros(num_trajectories)
+    for idx in 1:num_trajectories
+        reset!(env)
+        ret[idx] = single_trajectory_normalized_return(env)
+    end
+    return mean(ret)
+end
+
+function mean_and_std_returns(env,num_trajectories)
+    ret = zeros(num_trajectories)
+    for idx in 1:num_trajectories
+        reset!(env)
+        ret[idx] = single_trajectory_return(env)
+    end
+    avg = mean(ret)
+    dev = std(ret)
+    return avg, dev
+end
+
+function mean_and_std_normalized_returns(env,num_trajectories)
+    ret = zeros(num_trajectories)
+    for idx in 1:num_trajectories
+        reset!(env)
+        ret[idx] = single_trajectory_normalized_return(env)
+    end
     avg = mean(ret)
     dev = std(ret)
     return avg, dev
