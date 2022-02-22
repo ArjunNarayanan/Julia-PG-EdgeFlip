@@ -45,7 +45,7 @@ end
 Flux.@functor Policy
 
 nref = 1
-nflips = 5
+nflips = 8
 maxflips = ceil(Int, 1.2nflips)
 env = EdgeFlip.GameEnv(nref, nflips, fixed_reset = false, maxflips = maxflips)
 
