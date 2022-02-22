@@ -10,9 +10,9 @@ end
 
 function two_edge_game_env(; vertex_score = rand(-3:3, 5))
     t = [
-        1 2 5
-        2 4 5
-        2 3 4
+        1 2 4
+        1 3 2
+        1 5 3
     ]
     p = rand(5, 2)
     mesh = EdgeFlip.Mesh(p, t)
@@ -20,7 +20,6 @@ function two_edge_game_env(; vertex_score = rand(-3:3, 5))
     env = EdgeFlip.GameEnv(mesh, 0, d0 = mesh.d - vertex_score, maxflips = 2)
     return env
 end
-
 
 env = two_edge_game_env()
 ret = GreedyPolicy.average_return(env, 100000)
