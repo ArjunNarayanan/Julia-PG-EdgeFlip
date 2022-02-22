@@ -35,8 +35,8 @@ function greedy_action(env)
     r = EdgeFlip.reward(env,(it,j))
     num_actions = EdgeFlip.number_of_actions(env)
 
-    # edgeid = r < 0 ? num_actions + 1 : env.mesh.t2e[it,j]
-    edgeid = env.mesh.t2e[it,j]
+    edgeid = r < 0 ? 0 : env.mesh.t2e[it,j]
+    # edgeid = env.mesh.t2e[it,j]
     return edgeid
 end
 
@@ -62,6 +62,15 @@ function single_trajectory_normalized_return(env)
     return ret/maxscore
 end
 
+function average_return(env, num_trajectories)
+    ret = zeros(num_trajectories)
+    for idx in 1:num_trajectories
+        reset!(env)
+        ret[idx] = single_trajectory_return(env)
+    end
+    return mean(ret)
+end
+
 function average_normalized_returns(env, num_trajectories)
     ret = zeros(num_trajectories)
     for idx in 1:num_trajectories
@@ -69,28 +78,6 @@ function average_normalized_returns(env, num_trajectories)
         ret[idx] = single_trajectory_normalized_return(env)
     end
     return mean(ret)
-end
-
-function mean_and_std_returns(env,num_trajectories)
-    ret = zeros(num_trajectories)
-    for idx in 1:num_trajectories
-        reset!(env)
-        ret[idx] = single_trajectory_return(env)
-    end
-    avg = mean(ret)
-    dev = std(ret)
-    return avg, dev
-end
-
-function mean_and_std_normalized_returns(env,num_trajectories)
-    ret = zeros(num_trajectories)
-    for idx in 1:num_trajectories
-        reset!(env)
-        ret[idx] = single_trajectory_normalized_return(env)
-    end
-    avg = mean(ret)
-    dev = std(ret)
-    return avg, dev
 end
 
 end
