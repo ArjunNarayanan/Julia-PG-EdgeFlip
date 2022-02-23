@@ -2,16 +2,18 @@ using PyPlot
 pygui(true)
 using MeshPlotter
 
-function plot_history(history; optimum = nothing, title = "", filename = "")
+function plot_history(epochs, history; optimum = nothing, opt_label = "", title = "", filename = "", ylim = [0.,1.2])
     fig, ax = subplots()
-    ax.plot(history, label = "avg reward")
+    ax.plot(epochs, history)
     if !isnothing(optimum)
-        ax.plot(optimum * ones(length(history)), "--", label = "optimum")
+        ax.plot(epochs, optimum * ones(length(epochs)), "--", label = opt_label)
     end
     ax.set_title(title)
     ax.grid()
     ax.legend()
     ax.set_xlabel("Epochs")
+    ax.set_ylabel("Avg Return")
+    ax.set_ylim(ylim)
     if length(filename) > 0
         fig.savefig(filename)
     end

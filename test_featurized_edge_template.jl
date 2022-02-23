@@ -31,9 +31,10 @@ function PolicyGradient.score(env::EdgeFlip.GameEnv)
     return EdgeFlip.score(env)
 end
 
-function edge_state(edge_potentials, edge_template, bval)
-    es = [e == 0 ? bval : edge_potentials[e] for e in edge_template]
-    return es
+function evaluate_edge(edgeid, ep, et, bvec, emodel)
+    nbr_edges = et[:,edgeid]
+    es = vcat([e == 0 ? bvec : ep[:,e] for e in nbr_edges]...)
+    return emodel(es)[1]
 end
 
 struct EdgePolicy
@@ -41,9 +42,9 @@ struct EdgePolicy
     emodel::Any
     bmodel::Any
     function EdgePolicy()
-        vmodel = Dense(4, 1)
-        emodel = Dense(5, 1)
-        bmodel = Flux.glorot_uniform(1)
+        vmodel = Chain(Dense(4, 4, relu),Dense(4,4))
+        emodel = Dense(20, 1)
+        bmodel = Flux.glorot_uniform(4)
         new(vmodel, emodel, bmodel)
     end
 end
@@ -52,16 +53,12 @@ function (p::EdgePolicy)(state)
     vertex_template_score, edge_template = state[1], state[2]
 
     ep = p.vmodel(vertex_template_score)
-    es = edge_state(ep, edge_template, p.bmodel[1])
-
-    logits = vec(p.emodel(es))
+    logits = [evaluate_edge(e, ep, edge_template, p.bmodel, p.emodel) for e in 1:size(edge_template,2)]
 
     return logits
 end
 
 Flux.@functor EdgePolicy
-
-policy = EdgePolicy()
 
 nref = 1
 nflips = 8
@@ -70,9 +67,11 @@ env = EdgeFlip.GameEnv(nref, nflips, fixed_reset = false, maxflips = maxflips)
 
 learning_rate = 0.1
 batch_size = 32
-num_epochs = 5000
+num_epochs = 1000
 num_trajectories = 100
 
+policy = EdgePolicy()
+old_bmodel = deepcopy(policy.bmodel)
 epoch_history, return_history = PolicyGradient.run_training_loop(
     env,
     policy,
@@ -82,7 +81,8 @@ epoch_history, return_history = PolicyGradient.run_training_loop(
     num_trajectories,
     estimate_every = 100,
 );
+new_bmodel = deepcopy(policy.bmodel)
 
-include("plot.jl")
-filename = "results/extended-template/edge-template.png"
-plot_history(epoch_history, return_history, optimum = 0.91, opt_label = "greedy", filename = filename)
+# include("plot.jl")
+# filename = "results/extended-template/nl-featurized-edge-template.png"
+# plot_history(epoch_history, return_history, optimum = 0.91, opt_label = "greedy", filename = filename)
