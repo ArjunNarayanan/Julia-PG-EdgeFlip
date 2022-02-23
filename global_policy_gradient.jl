@@ -104,8 +104,12 @@ end
 
 function single_trajectory_normalized_return(env, policy)
     maxscore = score(env)
-    ret = single_trajectory_return(env, policy)
-    return ret/maxscore
+    if maxscore == 0
+        return 0.0
+    else
+        ret = single_trajectory_return(env, policy)
+        return ret/maxscore
+    end
 end
 
 function average_returns(env, policy, num_trajectories)

@@ -4,7 +4,6 @@ using Flux
 using Distributions: Categorical
 using Statistics
 
-# dummy functions overload with your methods
 function step!(env::EdgeFlip.GameEnv, action)
     num_actions = EdgeFlip.number_of_actions(env)
     if 0 < action <= num_actions
@@ -33,7 +32,6 @@ end
 function greedy_action(env)
     it,j = EdgeFlip.greedy_action(env)
     r = EdgeFlip.reward(env,(it,j))
-    num_actions = EdgeFlip.number_of_actions(env)
 
     edgeid = r < 0 ? 0 : env.mesh.t2e[it,j]
     # edgeid = env.mesh.t2e[it,j]
@@ -58,8 +56,12 @@ end
 
 function single_trajectory_normalized_return(env)
     maxscore = score(env)
-    ret = single_trajectory_return(env)
-    return ret/maxscore
+    if maxscore == 0
+        return 0.0
+    else
+        ret = single_trajectory_return(env)
+        return ret/maxscore
+    end
 end
 
 function average_return(env, num_trajectories)

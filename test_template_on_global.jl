@@ -1,7 +1,6 @@
 using Flux
 using Distributions: Categorical
 using EdgeFlip
-# import EdgeFlip: state, step!, is_terminated, reward, reset!
 using Printf
 include("global_policy_gradient.jl")
 include("greedy_policy.jl")
@@ -72,12 +71,12 @@ epoch_history, return_history = PolicyGradient.run_training_loop(
 )
 
 
-num_test_trajectories = 1000
-nn_avg =
-    PolicyGradient.average_normalized_returns(env, policy, num_test_trajectories)
-greedy_avg = GreedyPolicy.average_normalized_returns(env, num_test_trajectories)
-@printf "NN MEAN : %2.3f\n" nn_avg
-@printf "GD MEAN : %2.3f\n" greedy_avg
+# num_test_trajectories = 1000
+# nn_avg =
+#     PolicyGradient.average_normalized_returns(env, policy, num_test_trajectories)
+# greedy_avg = GreedyPolicy.average_normalized_returns(env, num_test_trajectories)
+# @printf "NN MEAN : %2.3f\n" nn_avg
+# @printf "GD MEAN : %2.3f\n" greedy_avg
 
 
 # reset!(env)
