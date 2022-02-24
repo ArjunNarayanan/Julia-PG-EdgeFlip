@@ -2,7 +2,15 @@ using PyPlot
 pygui(true)
 using MeshPlotter
 
-function plot_history(epochs, history; optimum = nothing, opt_label = "", title = "", filename = "", ylim = [0.,1.2])
+function plot_history(
+    epochs,
+    history;
+    optimum = nothing,
+    opt_label = "",
+    title = "",
+    filename = "",
+    ylim = [0.0, 1.2],
+)
     fig, ax = subplots()
     ax.plot(epochs, history)
     if !isnothing(optimum)
@@ -81,10 +89,10 @@ function render_policy(env; pause = 0.5, maxsteps = 20, filename = "", figsize =
     end
 end
 
-function plot_returns(nflips,ret,dev;filename="",ylim=(0.75,1.0))
-    fig,ax = subplots()
-    ax.plot(nflips,ret)
-    ax.fill_between(nflips,ret+dev,ret-dev,alpha=0.2,facecolor="blue")
+function plot_returns(nflips, ret, dev; filename = "", ylim = (0.75, 1.0))
+    fig, ax = subplots()
+    ax.plot(nflips, ret)
+    ax.fill_between(nflips, ret + dev, ret - dev, alpha = 0.2, facecolor = "blue")
     ax.set_xlabel("Normalized number of random initial flips")
     ax.set_ylabel("Normalized returns")
     ax.set_title("Normalized returns vs initial flips for greedy algorithm")
@@ -93,4 +101,20 @@ function plot_returns(nflips,ret,dev;filename="",ylim=(0.75,1.0))
         fig.savefig(filename)
     end
     return fig
+end
+
+function plot_learning_curve!(ax, epochs, returns)
+    ax.plot(epochs, returns, alpha = 0.6, color = "red")
+end
+
+function plot_learning_curves(data;)
+    fig,ax = subplots()
+    for d in data
+        plot_learning_curve!(ax, d[:,1], d[:,2])
+    end
+    ax.grid()
+    # ax.set_ylim(ylim)
+    ax.set_xlabel("epochs")
+    ax.set_ylabel("returns")
+    return fig, ax
 end

@@ -31,7 +31,17 @@ function step_trajectory(env, policy)
     return logp, r
 end
 
-function collect_batch_trajectories(env, policy, batch_size)
+function advantage(rewards, discount)
+    numsteps = length(rewards)
+    weights = zeros(numsteps)
+    weights[numsteps] = rewards[numsteps]
+    for step = (numsteps-1):-1:1
+        weights[step] = rewards[step] + discount * weights[step+1]
+    end
+    return weights
+end
+
+function collect_batch_trajectories(env, policy, batch_size, discount)
     batch_states = []
     batch_actions = []
     ep_rewards = []
@@ -53,7 +63,7 @@ function collect_batch_trajectories(env, policy, batch_size)
         append!(ep_rewards, r)
 
         if done || length(batch_actions) >= batch_size
-            ep_ret = reverse(cumsum(reverse(ep_rewards)))
+            ep_ret = advantage(ep_rewards, discount)
             append!(batch_weights, ep_ret)
             append!(batch_returns, sum(ep_rewards))
 
@@ -71,9 +81,9 @@ function collect_batch_trajectories(env, policy, batch_size)
     return batch_states, batch_actions, batch_weights, avg_return
 end
 
-function step_epoch(env, policy, optimizer, batch_size)
+function step_epoch(env, policy, optimizer, batch_size, discount)
     states, actions, weights, avg_return =
-        collect_batch_trajectories(env, policy, batch_size)
+        collect_batch_trajectories(env, policy, batch_size, discount)
 
     θ = params(policy)
     loss = 0.0
@@ -101,20 +111,19 @@ function single_trajectory_return(env, policy)
     end
 end
 
-
 function single_trajectory_normalized_return(env, policy)
     maxscore = score(env)
     if maxscore == 0
         return 0.0
     else
         ret = single_trajectory_return(env, policy)
-        return ret/maxscore
+        return ret / maxscore
     end
 end
 
 function average_returns(env, policy, num_trajectories)
     ret = zeros(num_trajectories)
-    for idx in 1:num_trajectories
+    for idx = 1:num_trajectories
         reset!(env)
         ret[idx] = single_trajectory_return(env, policy)
     end
@@ -123,7 +132,7 @@ end
 
 function average_normalized_returns(env, policy, num_trajectories)
     ret = zeros(num_trajectories)
-    for idx in 1:num_trajectories
+    for idx = 1:num_trajectories
         reset!(env)
         ret[idx] = single_trajectory_normalized_return(env, policy)
     end
@@ -134,6 +143,7 @@ function run_training_loop(
     env,
     policy,
     batch_size,
+    discount,
     num_epochs,
     learning_rate,
     num_trajectories;
@@ -144,7 +154,7 @@ function run_training_loop(
     epoch_history = []
 
     for epoch = 1:num_epochs
-        loss, avg_return = step_epoch(env, policy, optimizer, batch_size)
+        loss, avg_return = step_epoch(env, policy, optimizer, batch_size, discount)
 
         if epoch % estimate_every == 0
             avg_return = average_normalized_returns(env, policy, num_trajectories)
