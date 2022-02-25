@@ -2,31 +2,35 @@ using BenchmarkTools
 using Flux
 using Distributions: Categorical
 using EdgeFlip
-include("global_policy_gradient.jl")
+include("edge_policy_gradient.jl")
 
-function PolicyGradient.state(env::EdgeFlip.GameEnv)
+PG = EdgePolicyGradient
+
+function PG.state(env::EdgeFlip.GameEnv)
     vs = EdgeFlip.vertex_template_score(env)
     et = EdgeFlip.edge_template(env)
+    num_edges = size(vs, 2)
+    et[et.==0] .= num_edges + 1
     return vs, et
 end
 
-function PolicyGradient.step!(env::EdgeFlip.GameEnv, action)
+function PG.step!(env::EdgeFlip.GameEnv, action)
     EdgeFlip.step!(env, action)
 end
 
-function PolicyGradient.is_terminated(env::EdgeFlip.GameEnv)
+function PG.is_terminated(env::EdgeFlip.GameEnv)
     return EdgeFlip.is_terminated(env)
 end
 
-function PolicyGradient.reward(env::EdgeFlip.GameEnv)
+function PG.reward(env::EdgeFlip.GameEnv)
     return EdgeFlip.reward(env)
 end
 
-function PolicyGradient.reset!(env::EdgeFlip.GameEnv)
+function PG.reset!(env::EdgeFlip.GameEnv)
     EdgeFlip.reset!(env)
 end
 
-function PolicyGradient.score(env::EdgeFlip.GameEnv)
+function PG.score(env::EdgeFlip.GameEnv)
     return EdgeFlip.score(env)
 end
 
@@ -44,21 +48,20 @@ struct EdgePolicy
     end
 end
 
-function (p::EdgePolicy)(s)
-    vertex_template_score, edge_template = s[1], s[2]
+function (p::EdgePolicy)(state)
+    vertex_template_score, edge_template = state
+    num_edges = size(vertex_template_score, 2)
+
     ep = p.vmodel(vertex_template_score)
+    ep = cat(ep, p.bmodel, dims = 2)
 
-    es = old_edge_state(ep, edge_template, p.bmodel)
-    es = p.emodel(es)
-
-    logits = vec(es)
+    es = edge_state(ep, edge_template, num_edges)
+    logits = p.emodel(es)
 
     return logits
 end
 
-function (p::EdgePolicy)(vertex_template_score, edge_template)
-    @assert size(vertex_template_score, 3) == size(edge_template, 3)
-    num_batches = size(vertex_template_score, 3)
+function (p::EdgePolicy)(vertex_template_score, edge_template, num_batches)
     num_edges = size(vertex_template_score, 2)
 
     ep = p.vmodel(vertex_template_score)
@@ -85,22 +88,6 @@ function edge_state(edge_potentials, edge_template, num_edges)
     return hcat(es...)
 end
 
-function old_single_edge_state(edgeid, edge_potentials, edge_template, boundary_values)
-    nbr_edges = edge_template[:, edgeid]
-    es = vcat([e == 0 ? boundary_values : edge_potentials[:, e] for e in nbr_edges]...)
-    return es
-end
-
-function old_edge_state(edge_potentials, edge_template, boundary_values)
-    es = hcat(
-        [
-            old_single_edge_state(e, edge_potentials, edge_template, boundary_values)
-            for e = 1:size(edge_potentials, 2)
-        ]...,
-    )
-    return es
-end
-
 function batch_edge_state(edge_potentials, edge_template, num_edges)
     @assert size(edge_potentials, 3) == size(edge_template, 3)
     num_batches = size(edge_template, 3)
@@ -111,36 +98,13 @@ function batch_edge_state(edge_potentials, edge_template, num_edges)
     return cat(es..., dims = 3)
 end
 
-# function (p::EdgePolicy)(vertex_template_score, edge_template)
-
-#     ep = p.vmodel(vertex_template_score)
-
-#     es = old_edge_state(ep, edge_template, p.bmodel)
-#     es = p.emodel(es)
-
-#     logits = vec(es)
-
-#     return logits
-# end
-
-function get_gradient(vertex_template_score, edge_template, policy, actions, weights)
-    θ = Flux.params(policy)
-    loss = 0.0
-    grads = Flux.gradient(θ) do
-        loss = PolicyGradient.edge_policy_gradient_loss(vertex_template_score, edge_template, policy, actions, weights)
+function get_gradient(vs, et, policy, actions, weights)
+    theta = Flux.params(policy)
+    grads = Flux.gradient(theta) do
+        loss = PG.policy_gradient_loss(vs, et, policy, actions, weights)
     end
     return grads
 end
-
-function old_get_gradient(states, policy, actions, weights)
-    θ = Flux.params(policy)
-    loss = 0.0
-    grads = Flux.gradient(θ) do
-        loss = PolicyGradient.old_policy_gradient_loss(states, policy, actions, weights)
-    end
-    return grads
-end
-
 
 nref = 1
 nflips = 8
@@ -159,27 +123,19 @@ policy = EdgePolicy()
 optimizer = ADAM(learning_rate)
 
 
+vs, et, actions, weights, ret =
+    PG.collect_batch_trajectories(env, policy, batch_size, discount)
+@btime PG.collect_batch_trajectories($env, $policy, $batch_size, $discount)
 
-vs, et = PolicyGradient.state(env)
+@btime get_gradient($vs, $et, $policy, $actions, $weights)
 
-mvs = repeat(vs, inner = (1, 1, batch_size))
-met = repeat(et, inner = (1, 1, batch_size))
-met[met .== 0] .= 43
-actions = rand(1:42,32)
-weights = rand(32)
 
-grads = get_gradient(mvs, met, policy, actions, weights)
-@btime get_gradient($mvs, $met, $policy, $actions, $weights)
-
-# states, actions, weights, ret =
-#     PolicyGradient.old_collect_batch_trajectories(env, policy, batch_size, discount)
-
-# @btime PolicyGradient.old_collect_batch_trajectories($env, $policy, $batch_size, $discount)
-
-# grads = old_get_gradient(states, policy, actions, weights)
-# @btime old_get_gradient($states, $policy, $actions, $weights)
-
-# theta = Flux.params(policy)
-# Flux.update!(optimizer, theta, grads)
-
-# @btime Flux.update!($optimizer, $theta, $grads)
+# PG.run_training_loop(env, policy, batch_size, discount, num_epochs, learning_rate)
+# @btime PG.run_training_loop(
+#     $env,
+#     $policy,
+#     $batch_size,
+#     $discount,
+#     $num_epochs,
+#     $learning_rate,
+# )
