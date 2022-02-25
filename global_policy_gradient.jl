@@ -1,6 +1,5 @@
 module PolicyGradient
 
-# using EdgeFlip: state, step!, reward, is_terminated, reset!, score
 using Flux
 using Distributions: Categorical
 using Printf
@@ -14,10 +13,18 @@ is_terminated(env) = nothing
 reset!(env) = nothing
 score(env) = nothing
 
-function policy_gradient_loss(states, policy, actions, weights)
+function old_policy_gradient_loss(states, policy, actions, weights)
     logp = logsoftmax.(policy.(states))
     logp = -[logp[i][actions[i]] for i = 1:length(actions)]
     loss = Flux.mean(logp .* weights)
+    return loss
+end
+
+function policy_gradient_loss(states, policy, actions, weights)
+    logits = policy.model(states)
+    logp = logsoftmax(logits, dims = 2)
+    selected_logp = -[logp[1, action, idx] for (idx, action) in enumerate(actions)]
+    loss = Flux.mean(selected_logp .* weights)
     return loss
 end
 
@@ -51,7 +58,7 @@ function collect_batch_trajectories(env, policy, batch_size, discount)
     while true
         s = state(env)
         logits = policy(s)
-        probs = Categorical(softmax(logits))
+        probs = Categorical(vec(softmax(logits, dims = 2)))
         action = rand(probs)
 
         step!(env, action)
@@ -75,6 +82,8 @@ function collect_batch_trajectories(env, policy, batch_size, discount)
             end
         end
     end
+
+    batch_states = cat(batch_states..., dims = 3)
 
     avg_return = sum(batch_returns) / length(batch_returns)
 
@@ -102,7 +111,8 @@ function single_trajectory_return(env, policy)
         return 0.0
     else
         while !done
-            action = env |> state |> policy |> softmax |> Categorical |> rand
+            probs = vec(softmax(policy(state(env)), dims = 2))
+            action = rand(Categorical(probs))
             step!(env, action)
             push!(ep_returns, reward(env))
             done = is_terminated(env)
@@ -145,9 +155,8 @@ function run_training_loop(
     batch_size,
     discount,
     num_epochs,
-    learning_rate,
-    num_trajectories;
-    estimate_every = 10,
+    learning_rate;
+    print_every = 100,
 )
     optimizer = ADAM(learning_rate)
     return_history = []
@@ -156,12 +165,12 @@ function run_training_loop(
     for epoch = 1:num_epochs
         loss, avg_return = step_epoch(env, policy, optimizer, batch_size, discount)
 
-        if epoch % estimate_every == 0
-            avg_return = average_normalized_returns(env, policy, num_trajectories)
-            append!(return_history, avg_return)
-            append!(epoch_history, epoch)
+        append!(return_history, avg_return)
+        append!(epoch_history, epoch)
+
+        if epoch % print_every == 0
             statement =
-                @sprintf "epoch: %3d \t loss: %.4f \t avg return: %3.2f" epoch loss avg_return
+            @sprintf "epoch: %3d \t loss: %.4f \t avg return: %3.2f" epoch loss avg_return
             println(statement)
         end
     end
