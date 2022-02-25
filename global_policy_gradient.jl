@@ -21,7 +21,15 @@ function old_policy_gradient_loss(states, policy, actions, weights)
 end
 
 function policy_gradient_loss(states, policy, actions, weights)
-    logits = policy.model(states)
+    logits = policy(states)
+    logp = logsoftmax(logits, dims = 2)
+    selected_logp = -[logp[1, action, idx] for (idx, action) in enumerate(actions)]
+    loss = Flux.mean(selected_logp .* weights)
+    return loss
+end
+
+function edge_policy_gradient_loss(vertex_template_score, edge_template, policy, actions, weights)
+    logits = policy(vertex_template_score, edge_template)
     logp = logsoftmax(logits, dims = 2)
     selected_logp = -[logp[1, action, idx] for (idx, action) in enumerate(actions)]
     loss = Flux.mean(selected_logp .* weights)
@@ -88,6 +96,69 @@ function collect_batch_trajectories(env, policy, batch_size, discount)
     avg_return = sum(batch_returns) / length(batch_returns)
 
     return batch_states, batch_actions, batch_weights, avg_return
+end
+
+function old_collect_batch_trajectories(env, policy, batch_size, discount)
+    batch_states = []
+    batch_actions = []
+    ep_rewards = []
+    batch_weights = []
+    batch_returns = []
+
+    while true
+        s = state(env)
+        logits = policy(s)
+        probs = Categorical(softmax(logits))
+        action = rand(probs)
+
+        step!(env, action)
+        r = reward(env)
+        done = is_terminated(env)
+
+        push!(batch_states, s)
+        append!(batch_actions, action)
+        append!(ep_rewards, r)
+
+        if done || length(batch_actions) >= batch_size
+            ep_ret = advantage(ep_rewards, discount)
+            append!(batch_weights, ep_ret)
+            append!(batch_returns, sum(ep_rewards))
+
+            if length(batch_actions) >= batch_size
+                break
+            else
+                reset!(env)
+                ep_rewards = []
+            end
+        end
+    end
+
+    # batch_states = cat(batch_states..., dims = 3)
+    avg_return = sum(batch_returns) / length(batch_returns)
+
+    return batch_states, batch_actions, batch_weights, avg_return
+end
+
+function collect_batch_trajectories!(states, actions, rewards, terminal, env, policy, batch_size)
+    for counter in 1:batch_size
+        s = state(env)
+        logits = policy(s)
+        probs = Categorical(vec(softmax(logits, dims = 2)))
+        action = rand(probs)
+
+        step!(env, action)
+        r = reward(env)
+        done = is_terminated(env)
+
+        states[:,:,counter] .= s
+        actions[counter] = action
+        rewards[counter] = r
+        terminal[counter] = done
+
+        if done
+            reset!(env)
+        end
+    end
 end
 
 function step_epoch(env, policy, optimizer, batch_size, discount)

@@ -94,26 +94,6 @@ optimizer = ADAM(learning_rate)
 
 
 
-# states, actions, weights, ret =
-#     PolicyGradient.collect_batch_trajectories(env, policy, batch_size, discount);
-# @btime states, actions, weights, ret =
-#     PolicyGradient.collect_batch_trajectories($env, $policy, $batch_size, $discount)
-
-# grads = get_gradient(states, policy, actions, weights)
-# @btime get_gradient($states, $policy, $actions, $weights)
-
-# θ = Flux.params(policy)
-# Flux.update!(optimizer, θ, grads)
-
-# @btime Flux.update!($optimizer, $θ, $grads)
-
-# loss, ret = PolicyGradient.step_epoch(env, policy, optimizer, batch_size, discount)
-# @btime PolicyGradient.step_epoch($env, $policy, $optimizer, $batch_size, $discount)
-
-# ret = PolicyGradient.average_normalized_returns(env, policy, num_trajectories)
-# @btime PolicyGradient.average_normalized_returns($env, $policy, $num_trajectories)
-
-
 PolicyGradient.run_training_loop(
     env,
     policy,
@@ -123,12 +103,12 @@ PolicyGradient.run_training_loop(
     learning_rate,
     print_every = 100,
 )
-@btime PolicyGradient.run_training_loop(
-    $env,
-    $policy,
-    $batch_size,
-    $discount,
-    $num_epochs,
-    $learning_rate,
-    print_every = 100,
-)
+# @btime PolicyGradient.run_training_loop(
+#     $env,
+#     $policy,
+#     $batch_size,
+#     $discount,
+#     $num_epochs,
+#     $learning_rate,
+#     print_every = 100,
+# )
