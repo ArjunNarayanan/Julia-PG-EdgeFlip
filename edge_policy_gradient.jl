@@ -99,6 +99,51 @@ function step_epoch(env, policy, optimizer, batch_size, discount)
     return loss, avg_return
 end
 
+function single_trajectory_return(env, policy)
+    ep_returns = []
+    done = is_terminated(env)
+    if done
+        return 0.0
+    else
+        while !done
+            probs = vec(softmax(policy(state(env)), dims = 2))
+            action = rand(Categorical(probs))
+            step!(env, action)
+            push!(ep_returns, reward(env))
+            done = is_terminated(env)
+        end
+        return sum(ep_returns)
+    end
+end
+
+function single_trajectory_normalized_return(env, policy)
+    maxscore = score(env)
+    if maxscore == 0
+        return 0.0
+    else
+        ret = single_trajectory_return(env, policy)
+        return ret / maxscore
+    end
+end
+
+function average_returns(env, policy, num_trajectories)
+    ret = zeros(num_trajectories)
+    for idx = 1:num_trajectories
+        reset!(env)
+        ret[idx] = single_trajectory_return(env, policy)
+    end
+    return mean(ret)
+end
+
+function average_normalized_returns(env, policy, num_trajectories)
+    ret = zeros(num_trajectories)
+    for idx = 1:num_trajectories
+        reset!(env)
+        ret[idx] = single_trajectory_normalized_return(env, policy)
+    end
+    return mean(ret)
+end
+
 function run_training_loop(
     env,
     policy,
@@ -126,5 +171,51 @@ function run_training_loop(
     end
     return epoch_history, return_history
 end
+
+function single_trajectory_return(env, policy)
+    ep_returns = []
+    done = is_terminated(env)
+    if done
+        return 0.0
+    else
+        while !done
+            probs = vec(softmax(policy(state(env)), dims = 2))
+            action = rand(Categorical(probs))
+            step!(env, action)
+            push!(ep_returns, reward(env))
+            done = is_terminated(env)
+        end
+        return sum(ep_returns)
+    end
+end
+
+function single_trajectory_normalized_return(env, policy)
+    maxscore = score(env)
+    if maxscore == 0
+        return 0.0
+    else
+        ret = single_trajectory_return(env, policy)
+        return ret / maxscore
+    end
+end
+
+function average_returns(env, policy, num_trajectories)
+    ret = zeros(num_trajectories)
+    for idx = 1:num_trajectories
+        reset!(env)
+        ret[idx] = single_trajectory_return(env, policy)
+    end
+    return mean(ret)
+end
+
+function average_normalized_returns(env, policy, num_trajectories)
+    ret = zeros(num_trajectories)
+    for idx = 1:num_trajectories
+        reset!(env)
+        ret[idx] = single_trajectory_normalized_return(env, policy)
+    end
+    return mean(ret)
+end
+
 
 end

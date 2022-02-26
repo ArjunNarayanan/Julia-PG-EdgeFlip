@@ -2,48 +2,60 @@ using Flux
 using Distributions: Categorical
 using EdgeFlip
 using Printf
-include("global_policy_gradient.jl")
+include("edge_policy_gradient.jl")
 
-function PolicyGradient.state(env::EdgeFlip.GameEnv)
+PG = EdgePolicyGradient
+
+function PG.state(env::EdgeFlip.GameEnv)
     vs = EdgeFlip.vertex_template_score(env)
     et = EdgeFlip.edge_template(env)
+    num_edges = size(vs, 2)
+    et[et.==0] .= num_edges + 1
     return vs, et
 end
 
-function PolicyGradient.step!(env::EdgeFlip.GameEnv, action)
+function PG.step!(env::EdgeFlip.GameEnv, action)
     EdgeFlip.step!(env, action)
 end
 
-function PolicyGradient.is_terminated(env::EdgeFlip.GameEnv)
+function PG.is_terminated(env::EdgeFlip.GameEnv)
     return EdgeFlip.is_terminated(env)
 end
 
-function PolicyGradient.reward(env::EdgeFlip.GameEnv)
+function PG.reward(env::EdgeFlip.GameEnv)
     return EdgeFlip.reward(env)
 end
 
-function PolicyGradient.reset!(env::EdgeFlip.GameEnv)
+function PG.reset!(env::EdgeFlip.GameEnv)
     EdgeFlip.reset!(env)
 end
 
-function PolicyGradient.score(env::EdgeFlip.GameEnv)
+function PG.score(env::EdgeFlip.GameEnv)
     return EdgeFlip.score(env)
 end
 
-function single_edge_state(edgeid, edge_potentials, edge_template, boundary_values)
-    nbr_edges = edge_template[:, edgeid]
-    es = vcat([e == 0 ? boundary_values : edge_potentials[:, e] for e in nbr_edges]...)
+function single_edge_state(edgeid, edge_potentials, edge_template)
+    es = vec(edge_potentials[:, edge_template[:, edgeid]])
     return es
 end
 
-function edge_state(edge_potentials, edge_template, boundary_values)
-    es = hcat(
-        [
-            single_edge_state(e, edge_potentials, edge_template, boundary_values) for
-            e = 1:size(edge_potentials, 2)
-        ]...,
-    )
-    return es
+function single_edge_state(edge_potentials, edgeids)
+    return vec(edge_potentials[:, edgeids])
+end
+
+function edge_state(edge_potentials, edge_template, num_edges)
+    es = [single_edge_state(e, edge_potentials, edge_template) for e = 1:num_edges]
+    return hcat(es...)
+end
+
+function batch_edge_state(edge_potentials, edge_template, num_edges)
+    @assert size(edge_potentials, 3) == size(edge_template, 3)
+    num_batches = size(edge_template, 3)
+    es = [
+        edge_state(edge_potentials[:, :, b], edge_template[:, :, b], num_edges) for
+        b = 1:num_batches
+    ]
+    return cat(es..., dims = 3)
 end
 
 struct EdgePolicy
@@ -62,16 +74,30 @@ end
 
 function (p::EdgePolicy)(state)
     vertex_template_score, edge_template = state[1], state[2]
+    num_edges = size(vertex_template_score, 2)
 
     ep = p.vmodel(vertex_template_score)
+    ep = cat(ep, p.bmodel, dims = 2)
 
-    es = edge_state(ep, edge_template, p.bmodel)
-    es = p.emodel(es)
-
-    logits = vec(es)
+    es = edge_state(ep, edge_template, num_edges)
+    logits = p.emodel(es)
 
     return logits
 end
+
+function (p::EdgePolicy)(states, num_batches)
+    vertex_template_score, edge_template = states
+    num_edges = size(vertex_template_score, 2)
+
+    ep = p.vmodel(vertex_template_score)
+    ep = cat(ep, repeat(p.bmodel, inner = (1, 1, num_batches)), dims = 2)
+
+    es = batch_edge_state(ep, edge_template, num_edges)
+    logits = p.emodel(es)
+
+    return logits
+end
+
 
 Flux.@functor EdgePolicy
 
@@ -81,31 +107,20 @@ maxflips = ceil(Int, 1.2nflips)
 env = EdgeFlip.GameEnv(nref, nflips, fixed_reset = false, maxflips = maxflips)
 
 discount = 0.9
-learning_rate = 0.001
-batch_size = 32
+learning_rate = 0.00005
+batch_size = 10maxflips
 num_epochs = 3000
 num_trajectories = 100
 
 policy = EdgePolicy()
 
-old_bmodel = deepcopy(policy.bmodel)
-epoch_history, return_history = PolicyGradient.run_training_loop(
+
+epoch_history, return_history = PG.run_training_loop(
     env,
     policy,
     batch_size,
     discount,
     num_epochs,
     learning_rate,
-    num_trajectories,
-    estimate_every = 100,
+    print_every = 100,
 );
-new_bmodel = deepcopy(policy.bmodel)
-
-
-
-# plot_history(epoch_history, return_history, optimum = 0.91, opt_label = "greedy")
-
-# epoch_history .+= 3000
-# include("plot.jl")
-# filename = "results/extended-template/one-level-edge-template.png"
-# plot_history(epoch_history, return_history, optimum = 0.91, opt_label = "greedy", filename = filename)

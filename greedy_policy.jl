@@ -33,8 +33,8 @@ function greedy_action(env)
     it,j = EdgeFlip.greedy_action(env)
     r = EdgeFlip.reward(env,(it,j))
 
-    edgeid = r < 0 ? 0 : env.mesh.t2e[it,j]
-    # edgeid = env.mesh.t2e[it,j]
+    # edgeid = r < 0 ? 0 : env.mesh.t2e[it,j]
+    edgeid = env.mesh.t2e[it,j]
     return edgeid
 end
 
@@ -64,7 +64,7 @@ function single_trajectory_normalized_return(env)
     end
 end
 
-function average_return(env, num_trajectories)
+function average_returns(env, num_trajectories)
     ret = zeros(num_trajectories)
     for idx in 1:num_trajectories
         reset!(env)

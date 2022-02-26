@@ -1,4 +1,4 @@
-module PolicyGradient
+module VertexPolicyGradient
 
 using Flux
 using Distributions: Categorical
@@ -14,9 +14,10 @@ reset!(env) = nothing
 score(env) = nothing
 
 function policy_gradient_loss(states, policy, actions, weights)
-    logp = logsoftmax.(policy.(states))
-    logp = -[logp[i][actions[i]] for i = 1:length(actions)]
-    loss = Flux.mean(logp .* weights)
+    logits = policy(states)
+    logp = logsoftmax(logits, dims = 2)
+    selected_logp = -[logp[1, action, idx] for (idx, action) in enumerate(actions)]
+    loss = Flux.mean(selected_logp .* weights)
     return loss
 end
 
@@ -40,7 +41,7 @@ function collect_batch_trajectories(env, policy, batch_size, discount)
     while true
         s = state(env)
         logits = policy(s)
-        probs = Categorical(softmax(logits))
+        probs = Categorical(vec(softmax(logits, dims = 2)))
         action = rand(probs)
 
         step!(env, action)
@@ -64,6 +65,8 @@ function collect_batch_trajectories(env, policy, batch_size, discount)
             end
         end
     end
+
+    batch_states = cat(batch_states..., dims = 3)
 
     avg_return = sum(batch_returns) / length(batch_returns)
 
