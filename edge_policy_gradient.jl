@@ -14,14 +14,13 @@ reset!(env) = nothing
 score(env) = nothing
 
 function policy_gradient_loss(
-    vertex_template_score,
-    edge_template,
+    states,
     policy,
     actions,
     weights,
 )
-    num_batches = size(edge_template, 3)
-    logits = policy(vertex_template_score, edge_template, num_batches)
+    num_batches = length(actions)
+    logits = policy(states, num_batches)
     logp = logsoftmax(logits, dims = 2)
     selected_logp = -[logp[1, action, idx] for (idx, action) in enumerate(actions)]
     loss = Flux.mean(selected_logp .* weights)
@@ -79,19 +78,21 @@ function collect_batch_trajectories(env, policy, batch_size, discount)
     mvs = cat(batch_vertex_scores..., dims = 3)
     met = cat(batch_edge_templates..., dims = 3)
 
+    states = (mvs, met)
+
     avg_return = sum(batch_returns) / length(batch_returns)
 
-    return mvs, met, batch_actions, batch_weights, avg_return
+    return states, batch_actions, batch_weights, avg_return
 end
 
 function step_epoch(env, policy, optimizer, batch_size, discount)
-    vertex_score, edge_template, actions, weights, avg_return =
+    states, actions, weights, avg_return =
         collect_batch_trajectories(env, policy, batch_size, discount)
 
     θ = params(policy)
     loss = 0.0
     grads = Flux.gradient(θ) do
-        loss = policy_gradient_loss(vertex_score, edge_template, policy, actions, weights)
+        loss = policy_gradient_loss(states, policy, actions, weights)
     end
 
     Flux.update!(optimizer, θ, grads)

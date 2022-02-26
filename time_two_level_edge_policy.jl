@@ -34,49 +34,61 @@ function PG.score(env::EdgeFlip.GameEnv)
     return EdgeFlip.score(env)
 end
 
-struct EdgePolicy
+struct TwoLevelEdgePolicy
     vmodel::Any
-    emodel::Any
-    bmodel::Any
-    function EdgePolicy()
+    emodel1::Any
+    bmodel1::Any
+    emodel2::Any
+    bmodel2::Any
+    function TwoLevelEdgePolicy()
         vmodel = Chain(Dense(4, 4, relu), Dense(4, 4, relu), Dense(4, 4, relu))
 
-        emodel = Chain(Dense(20, 10, relu), Dense(10, 10, relu), Dense(10, 1, relu))
-        bmodel = Flux.glorot_uniform(4)
+        emodel1 = Chain(Dense(20, 10, relu), Dense(10, 10, relu), Dense(10, 4, relu))
+        bmodel1 = Flux.glorot_uniform(4)
 
-        new(vmodel, emodel, bmodel)
+        emodel2 = Chain(Dense(20, 10, relu), Dense(10, 10, relu), Dense(10, 1))
+        bmodel2 = Flux.glorot_uniform(4)
+
+        new(vmodel, emodel1, bmodel1, emodel2, bmodel2)
     end
 end
 
-function (p::EdgePolicy)(state)
+function (p::TwoLevelEdgePolicy)(state)
     vertex_template_score, edge_template = state
     num_edges = size(vertex_template_score, 2)
 
     ep = p.vmodel(vertex_template_score)
-    ep = cat(ep, p.bmodel, dims = 2)
+    ep = cat(ep, p.bmodel1, dims = 2)
 
     es = edge_state(ep, edge_template, num_edges)
-    logits = p.emodel(es)
+    es = p.emodel1(es)
+
+    es = cat(es, p.bmodel2, dims = 2)
+    es = edge_state(es, edge_template, num_edges)
+
+    logits = p.emodel2(es)
 
     return logits
 end
 
-function (p::EdgePolicy)(states, num_batches)
-    vertex_template_score, edge_template = states
+function (p::TwoLevelEdgePolicy)(vertex_template_score, edge_template, num_batches)
     num_edges = size(vertex_template_score, 2)
 
     ep = p.vmodel(vertex_template_score)
-    ep = cat(ep, repeat(p.bmodel, inner = (1, 1, num_batches)), dims = 2)
+    ep = cat(ep, repeat(p.bmodel1, inner = (1, 1, num_batches)), dims = 2)
 
     es = batch_edge_state(ep, edge_template, num_edges)
-    es = p.emodel(es)
+    es = p.emodel1(es)
 
-    logits = es
+    es = cat(es, repeat(p.bmodel2, inner = (1, 1, num_batches)), dims = 2)
+    es = batch_edge_state(es, edge_template, num_edges)
+    
+    logits = p.emodel2(es)
 
     return logits
 end
 
-Flux.@functor EdgePolicy
+Flux.@functor TwoLevelEdgePolicy
 
 
 function single_edge_state(edgeid, edge_potentials, edge_template)
@@ -99,10 +111,10 @@ function batch_edge_state(edge_potentials, edge_template, num_edges)
     return cat(es..., dims = 3)
 end
 
-function get_gradient(states, policy, actions, weights)
+function get_gradient(vs, et, policy, actions, weights)
     theta = Flux.params(policy)
     grads = Flux.gradient(theta) do
-        loss = PG.policy_gradient_loss(states, policy, actions, weights)
+        loss = PG.policy_gradient_loss(vs, et, policy, actions, weights)
     end
     return grads
 end
@@ -120,19 +132,21 @@ num_epochs = 1000
 num_trajectories = 100
 
 
-policy = EdgePolicy()
+policy = TwoLevelEdgePolicy()
 optimizer = ADAM(learning_rate)
 
-# logits = policy(PG.state(env))
-# states, actions, weights, ret =
+# s = PG.state(env)
+# logits = policy(s)
+
+
+# vs, et, actions, weights, ret =
 #     PG.collect_batch_trajectories(env, policy, batch_size, discount)
 # @btime PG.collect_batch_trajectories($env, $policy, $batch_size, $discount)
 
-# get_gradient(states, policy, actions, weights)
-# @btime get_gradient($states, $policy, $actions, $weights)
+# get_gradient(vs, et, policy, actions, weights)
+# @btime get_gradient($vs, $et, $policy, $actions, $weights)
 
-
-PG.run_training_loop(env, policy, batch_size, discount, num_epochs, learning_rate)
+# PG.run_training_loop(env, policy, batch_size, discount, num_epochs, learning_rate)
 @btime PG.run_training_loop(
     $env,
     $policy,
