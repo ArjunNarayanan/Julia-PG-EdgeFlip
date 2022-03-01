@@ -1,7 +1,5 @@
 module GreedyPolicy
 using EdgeFlip
-using Flux
-using Distributions: Categorical
 using Statistics
 
 function step!(env::EdgeFlip.GameEnv, action)
