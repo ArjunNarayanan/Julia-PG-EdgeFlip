@@ -9,11 +9,16 @@ state(env) = nothing
 function collect_training_data!(state_data, greedy_probs, env)
     num_features, num_actions, num_batches = size(state_data)
     @assert size(greedy_probs) == (num_actions, num_batches)
-    for batch = 1:num_batches
+    counter = 1
+    while counter <= num_batches
         EdgeFlip.reset!(env)
-        s = state(env)
-        state_data[:, :, batch] .= s
-        greedy_probs[:, batch] .= greedy_action_distribution(env)
+        done = EdgeFlip.is_terminated(env)
+        if !done
+            s = state(env)
+            state_data[:, :, counter] .= s
+            greedy_probs[:, counter] .= greedy_action_distribution(env)
+            counter += 1
+        end
     end
 end
 
@@ -27,13 +32,15 @@ function greedy_action_distribution(env)
     return probs
 end
 
-function run_training_loop(env, policy, optimizer, batch_size, num_epochs; print_every = 100)
+function run_training_loop(env, policy, batch_size, num_epochs, learning_rate; print_every = 100)
     loss_history = zeros(num_epochs)
     
     s = state(env)
     nf, na = size(s)
     state_data = zeros(nf, na, batch_size)
     greedy_probs = zeros(na, batch_size)
+
+    optimizer = ADAM(learning_rate)
 
     for epoch = 1:num_epochs
         collect_training_data!(state_data, greedy_probs, env)
