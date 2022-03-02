@@ -75,23 +75,26 @@ function returns_vs_nflips(nflips, num_trajectories; maxstepfactor = 1.2)
     avg = zeros(length(nflips))
     dev = zeros(length(nflips))
     for (idx, nf) in enumerate(nflips)
-        println("number of flips = $nf")
         maxflips = ceil(Int, maxstepfactor * nf)
-        avg[idx], dev[idx] =
-            average_normalized_returns(nref, nf, maxflips, num_trajectories)
+        a, d =
+        average_normalized_returns(nref, nf, maxflips, num_trajectories)
+        avg[idx], dev[idx] = a, d
+        println("nflips = $nf \t avg = $a \t dev = $d")
     end
     return avg, dev
 end
 
 nref = 1
-nflips = 1:15
+nflips = 1:30
 # nflips = 15
 # maxflips = nflips
 
 # env = EdgeFlip.SteinerGameEnv(nref,15,maxflips=maxflips)
+# ret = single_trajectory_normalized_return(env)
+
 # render_policy(env)
 
-# avg, dev = returns_vs_nflips(nflips, 50, maxstepfactor = 1.0)
+# avg, dev = returns_vs_nflips(nflips, 50, maxstepfactor = 1.2)
 
 # mesh = EdgeFlip.generate_mesh(nref)
 # normalized_nflips = nflips ./ EdgeFlip.number_of_edges(mesh)

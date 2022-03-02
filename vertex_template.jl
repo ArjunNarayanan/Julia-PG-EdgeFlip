@@ -33,7 +33,8 @@ end
 struct VertexPolicy
     model::Any
     function VertexPolicy()
-        model = Chain(Dense(4, 4, relu), Dense(4, 4, relu), Dense(4, 1, relu))
+        # model = Chain(Dense(4, 4, relu), Dense(4, 4, relu), Dense(4, 1))
+        model = Chain(Dense(4,1))
         new(model)
     end
 end
@@ -49,27 +50,27 @@ nflips = 8
 maxflips = ceil(Int, 1.2nflips)
 env = EdgeFlip.GameEnv(nref, nflips, fixed_reset = false, maxflips = maxflips)
 
+# lr_schedule = Exp
 
-learning_rate = 0.001
-batch_size = 10maxflips
-discount = 0.8
-num_epochs = 10000
-num_trajectories = 100
+# learning_rate = 0.00005
+# batch_size = 10maxflips
+# discount = 0.8
+# num_epochs = 10000
+# num_trajectories = 100
 
-policy = VertexPolicy()
-optimizer = ADAM(learning_rate)
+# policy = VertexPolicy()
 
-epoch_history, return_history = PG.run_training_loop(
-    env,
-    policy,
-    batch_size,
-    discount,
-    num_epochs,
-    learning_rate,
-    print_every = 100,
-)
+# epoch_history, return_history = PG.run_training_loop(
+#     env,
+#     policy,
+#     batch_size,
+#     discount,
+#     num_epochs,
+#     learning_rate,
+#     print_every = 100,
+# )
 
-include("plot.jl")
+# include("plot.jl")
 
 # num_test_trajectories = 1000
 # nn_Avg = PG.average_returns(env, policy, num_test_trajectories)

@@ -25,7 +25,7 @@ end
 num_trajectories = 50
 nref = 1
 num_edges = EdgeFlip.number_of_edges(EdgeFlip.generate_mesh(nref))
-nflips = 1:15
+nflips = 1:30
 
 
 returns = [returns_vs_nflips(nref, nf, num_trajectories, maxstepfactor = 1.5) for nf in nflips];
