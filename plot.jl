@@ -1,6 +1,7 @@
 using PyPlot
 pygui(true)
 using MeshPlotter
+using Distributions: Categorical
 
 function plot_history(
     epochs,
@@ -30,29 +31,29 @@ function plot_history(
     return fig
 end
 
-function render_policy(env, policy; pause = 0.5, maxsteps = 20, filename = "", figsize = 10)
+function render_policy(env, policy; pause = 0.5, filename = "", figsize = 10)
     fig, ax = subplots(figsize = (figsize, figsize))
-    done = is_terminated(env)
-    EdgeFlip.plot!(ax, env.mesh, d0 = env.d0)
-    counter = 1
-    while !done && counter < maxsteps
+    done = EdgeFlip.is_terminated(env)
+    MeshPlotter.plot_mesh!(ax, env.mesh, d0 = env.d0)
+    while !done
         EdgeFlip.averagesmoothing!(env.mesh, 3)
-        MeshPlotter.plot!(ax, env.mesh, d0 = env.d0)
+        MeshPlotter.plot_mesh!(ax, env.mesh, d0 = env.d0)
 
         sleep(pause)
-        action = env |> state |> policy |> softmax |> Categorical |> rand
-        step!(env, action)
-        done = is_terminated(env)
+        logits = policy(state(env))
+        probs = Categorical(vec(softmax(logits, dims = 2)))
+        action = rand(probs)
+        EdgeFlip.step!(env, action)
+        done = EdgeFlip.is_terminated(env)
 
         if length(filename) > 0
             savepath = filename * "-" * lpad(counter, 2, "0") * ".png"
             fig.savefig(savepath)
         end
 
-        counter += 1
     end
     EdgeFlip.averagesmoothing!(env.mesh, 3)
-    MeshPlotter.plot!(ax, env.mesh, d0 = env.d0)
+    MeshPlotter.plot_mesh!(ax, env.mesh, d0 = env.d0)
 
     if length(filename) > 0
         savepath = filename * "-" * lpad(counter, 2, "0") * ".png"

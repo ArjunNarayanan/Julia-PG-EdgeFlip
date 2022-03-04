@@ -3,6 +3,7 @@ using Statistics
 using PyPlot
 using MeshPlotter
 using CSV, DataFrames
+include("greedy_policy.jl")
 pygui(true)
 
 function single_trajectory_return(env)
@@ -76,25 +77,37 @@ function returns_vs_nflips(nflips, num_trajectories; maxstepfactor = 1.2)
     dev = zeros(length(nflips))
     for (idx, nf) in enumerate(nflips)
         maxflips = ceil(Int, maxstepfactor * nf)
-        a, d =
-        average_normalized_returns(nref, nf, maxflips, num_trajectories)
+        a, d = average_normalized_returns(nref, nf, maxflips, num_trajectories)
         avg[idx], dev[idx] = a, d
         println("nflips = $nf \t avg = $a \t dev = $d")
     end
     return avg, dev
 end
 
-nref = 1
-nflips = 1:30
-# nflips = 15
-# maxflips = nflips
+function greedy_returns_vs_nflips(nflips, num_trajectories; maxstepfactor = 1.2)
+    avg = zeros(length(nflips))
+    for (idx, nf) in enumerate(nflips)
+        maxflips = ceil(Int, maxstepfactor * nf)
+        env = EdgeFlip.GameEnv(1, nf, maxflips = maxflips)
+        a = GreedyPolicy.average_normalized_returns(env, num_trajectories)
+        avg[idx] = a
+        println("nflips = $nf \t avg = $a")
+    end
+    return avg
+end
 
-# env = EdgeFlip.SteinerGameEnv(nref,15,maxflips=maxflips)
+nref = 1
+nflips = 1:5:36
+
+# nflips = 41
+# maxflips = ceil(Int, 1.2nflips)
+# env = EdgeFlip.SteinerGameEnv(nref, nflips, maxflips = maxflips)
 # ret = single_trajectory_normalized_return(env)
 
 # render_policy(env)
 
-# avg, dev = returns_vs_nflips(nflips, 50, maxstepfactor = 1.2)
+avg, dev = returns_vs_nflips(nflips, 100, maxstepfactor = 1.2)
+gd_avg = greedy_returns_vs_nflips(nflips, 500)
 
 # mesh = EdgeFlip.generate_mesh(nref)
 # normalized_nflips = nflips ./ EdgeFlip.number_of_edges(mesh)
@@ -103,12 +116,11 @@ nflips = 1:30
 # filename = "results/steiner-greedy-vs-nflips/nref-1.csv"
 # CSV.write(filename,df)
 
-# fig,ax = PyPlot.subplots()
-# ax.scatter(normalized_nflips, avg, label = "greedy + steiner")
-# ax.scatter(normalized_nflips, returns, label = "greedy")
-# ax.grid()
-# ax.legend()
-# ax.set_ylim(0.8,1.1)
-# ax.set_xlabel("normalized number of initial flips")
-# ax.set_ylabel("normalized average returns")
-# fig.savefig("results/steiner-greedy-vs-nflips/steiner-vs-greedy.png")
+fig,ax = PyPlot.subplots()
+ax.plot(normalized_nflips, avg, label = "greedy + steiner")
+ax.plot(normalized_nflips, gd_avg, label = "greedy")
+ax.legend()
+ax.set_ylim(0.75,1.0)
+ax.set_xlabel("normalized number of initial flips")
+ax.set_ylabel("normalized average returns")
+fig.savefig("results/steiner-greedy-vs-nflips/steiner-vs-greedy.png")

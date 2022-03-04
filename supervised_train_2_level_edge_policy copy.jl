@@ -81,70 +81,85 @@ function batch_edge_state(edge_potentials, edge_template, num_edges)
     return cat(es..., dims = 3)
 end
 
-struct EdgePolicy
+struct TwoLevelPolicy
     vmodel::Any
-    emodel::Any
-    bmodel::Any
-    function EdgePolicy()
+    emodel1::Any
+    bmodel1::Any
+    emodel2::Any
+    bmodel2::Any
+    function TwoLevelPolicy()
         vmodel = Chain(Dense(4, 4, relu), Dense(4, 4, relu), Dense(4, 4, relu))
 
-        emodel = Chain(Dense(20, 10, relu), Dense(10, 10, relu), Dense(10, 1, relu))
-        bmodel = Flux.glorot_uniform(4)
+        emodel1 = Chain(Dense(20, 10, relu), Dense(10, 10, relu), Dense(10, 4, relu))
+        bmodel1 = Flux.glorot_uniform(4)
 
-        new(vmodel, emodel, bmodel)
+        emodel2 = Chain(Dense(20, 10, relu), Dense(10, 10, relu), Dense(10, 1, relu))
+        bmodel2 = Flux.glorot_uniform(4)
+
+        new(vmodel, emodel1, bmodel1, emodel2, bmodel2)
     end
 end
 
-function (p::EdgePolicy)(state)
-    vertex_template_score, edge_template = state[1], state[2]
+function (p::TwoLevelPolicy)(state)
+    vertex_template_score, edge_template = state
     num_edges = size(vertex_template_score, 2)
 
     ep = p.vmodel(vertex_template_score)
-    ep = cat(ep, p.bmodel, dims = 2)
+    ep = cat(ep, p.bmodel1, dims = 2)
 
     es = edge_state(ep, edge_template, num_edges)
-    logits = p.emodel(es)
+    es = p.emodel1(es)
+
+    es = cat(es, p.bmodel2, dims = 2)
+    es = edge_state(es, edge_template, num_edges)
+    
+    logits = p.emodel2(es)
 
     return logits
 end
 
-function (p::EdgePolicy)(states, num_batches)
+function (p::TwoLevelPolicy)(states, num_batches)
     vertex_template_score, edge_template = states
     num_edges = size(vertex_template_score, 2)
 
     ep = p.vmodel(vertex_template_score)
-    ep = cat(ep, repeat(p.bmodel, inner = (1, 1, num_batches)), dims = 2)
+    ep = cat(ep, repeat(p.bmodel1, inner = (1, 1, num_batches)), dims = 2)
 
     es = batch_edge_state(ep, edge_template, num_edges)
-    logits = p.emodel(es)
+    es = p.emodel1(es)
+
+    es = cat(es, repeat(p.bmodel2, inner = (1, 1, num_batches)), dims = 2)
+    es = batch_edge_state(es, edge_template, num_edges)
+    
+    logits = p.emodel2(es)
 
     return logits
 end
 
-Flux.@functor EdgePolicy
+Flux.@functor TwoLevelPolicy
 
 nref = 1
 nflips = 8
 maxflips = ceil(Int, 1.2nflips)
 batch_size = 5maxflips
 num_supervised_epochs = 500
-num_rl_epochs = 10000
+num_rl_epochs = 1000
 sv_learning_rate = 0.001
 rl_learning_rate = 0.0005
-discount = 0.9
+discount = 1.0
 
 env = EdgeFlip.GameEnv(nref, nflips, maxflips = maxflips)
 num_actions = EdgeFlip.number_of_actions(env)
 
-policy = EdgePolicy()
+policy = TwoLevelPolicy()
 
-sv_loss = SV.run_edge_training_loop(
-    env,
-    policy,
-    batch_size,
-    num_supervised_epochs,
-    sv_learning_rate,
-)
+# sv_loss = SV.run_edge_training_loop(
+#     env,
+#     policy,
+#     batch_size,
+#     num_supervised_epochs,
+#     sv_learning_rate,
+# )
 
 
 # plot_history(
@@ -152,7 +167,7 @@ sv_loss = SV.run_edge_training_loop(
 #     sv_loss,
 #     ylim = [1, 5],
 #     ylabel = "cross entropy loss",
-#     filename = "results/supervised/edge-policy/edge-1-sv-loss.png",
+#     filename = "results/supervised/edge-policy/edge-2-sv-loss.png",
 # )
 
 rl_epochs, rl_loss =
@@ -163,13 +178,13 @@ num_trajectories = 500
 nflip_range = 1:5:42
 nn_ret = [returns_versus_nflips(policy, nref, nf, num_trajectories) for nf in nflip_range]
 # gd_ret = [returns_versus_nflips(nref, nf, num_trajectories) for nf in nflip_range]
-normalized_nflips = nflip_range ./ num_actions
-plot_returns(normalized_nflips, nn_ret, gd_ret = gd_ret, ylim = [0.75,1])
-# plot_returns(
-#     normalized_nflips,
-#     nn_ret,
-#     gd_ret = gd_ret,
-#     ylim = [0.75, 1],
-#     filename = "results/supervised/edge-policy/ep-1-rl-vs-gd-random-reset-10000.png",
-# )
+# normalized_nflips = nflip_range ./ num_actions
+# plot_returns(normalized_nflips, nn_ret, gd_ret = gd_ret, ylim = [0.75,1])
+plot_returns(
+    normalized_nflips,
+    nn_ret,
+    gd_ret = gd_ret,
+    ylim = [0.75, 1],
+    filename = "results/supervised/edge-policy/ep-2-rl-vs-gd-random-reset-10000.png",
+)
 
