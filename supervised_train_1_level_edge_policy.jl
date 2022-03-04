@@ -154,8 +154,8 @@ policy = EdgePolicy()
 #     filename = "results/supervised/edge-policy/edge-1-sv-loss.png",
 # )
 
-rl_epochs, rl_loss =
-    PG.run_training_loop(env, policy, batch_size, discount, num_rl_epochs, rl_learning_rate)
+# rl_epochs, rl_loss =
+#     PG.run_training_loop(env, policy, batch_size, discount, num_rl_epochs, rl_learning_rate)
 
 # state(env) = PG.state(env)
 # nflips = 36
@@ -167,8 +167,8 @@ rl_epochs, rl_loss =
 # nflip_range = 1:5:42
 # gd_ret = [returns_versus_nflips(nref, nf, num_trajectories) for nf in nflip_range]
 # normalized_nflips = nflip_range ./ num_actions
-nn_ret = [returns_versus_nflips(policy, nref, nf, num_trajectories) for nf in nflip_range]
-plot_returns(normalized_nflips, nn_ret, gd_ret = gd_ret, ylim = [0.75, 1])
+# nn_ret = [returns_versus_nflips(policy, nref, nf, num_trajectories) for nf in nflip_range]
+# plot_returns(normalized_nflips, nn_ret, gd_ret = gd_ret, ylim = [0.75, 1])
 # plot_returns(
 #     normalized_nflips,
 #     nn_ret,

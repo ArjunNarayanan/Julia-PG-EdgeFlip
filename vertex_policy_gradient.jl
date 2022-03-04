@@ -117,7 +117,7 @@ end
 function average_returns(env, policy, num_trajectories)
     ret = zeros(num_trajectories)
     for idx = 1:num_trajectories
-        reset!(env)
+        reset!(env, nflips = env.num_initial_flips)
         ret[idx] = single_trajectory_return(env, policy)
     end
     return mean(ret)
@@ -126,7 +126,7 @@ end
 function average_normalized_returns(env, policy, num_trajectories)
     ret = zeros(num_trajectories)
     for idx = 1:num_trajectories
-        reset!(env)
+        reset!(env, nflips = env.num_initial_flips)
         ret[idx] = single_trajectory_normalized_return(env, policy)
     end
     return mean(ret)
