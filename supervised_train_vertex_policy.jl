@@ -77,38 +77,30 @@ sv_learning_rate = 1e-3
 env = EdgeFlip.GameEnv(nref, nflips, maxflips = maxflips)
 num_actions = EdgeFlip.number_of_actions(env)
 
-policy = VertexPolicy()
+# policy = VertexPolicy()
 
-sv_loss =
-    SV.run_training_loop(env, policy, batch_size, num_supervised_epochs, sv_learning_rate)
-
-
-# plot_history(
-#     1:num_supervised_epochs,
-#     sv_loss,
-#     ylim = [1, 5],
-#     ylabel = "cross entropy loss",
-#     # filename = "results/supervised/vertex-4-1-sv-loss.png",
-# )
+# sv_loss =
+#     SV.run_training_loop(env, policy, batch_size, num_supervised_epochs, sv_learning_rate)
 
 # num_trajectories = 500
 # nflip_range = 1:5:42
+# gd_ret = [returns_versus_nflips(nref, nf, num_trajectories) for nf in nflip_range]
+# normalized_nflips = nflip_range ./ num_actions
 
-# num_rl_epochs = 10000
-# rl_learning_rate = 1e-4
+# num_rl_epochs = 5000
+# rl_learning_rate = 2e-3
 # discount = 0.9
+
 # rl_epochs, rl_loss =
 #     PG.run_training_loop(env, policy, batch_size, discount, num_rl_epochs, rl_learning_rate)
 # nn_ret = [returns_versus_nflips(policy, nref, nf, num_trajectories) for nf in nflip_range]
-# gd_ret = [returns_versus_nflips(nref, nf, num_trajectories) for nf in nflip_range]
-# normalized_nflips = nflip_range ./ num_actions
 # plot_returns(normalized_nflips, nn_ret, gd_ret = gd_ret, ylim = [0.75,1])
 # plot_returns(
 #     normalized_nflips,
 #     nn_ret,
 #     gd_ret = gd_ret,
 #     ylim = [0.75, 1],
-#     filename = "results/supervised/vertex-4-4-4-1-rl-vs-gd-5000.png",
+#     filename = "results/supervised/vertex-policy/vertex-4-1-rl-vs-gd-final.png",
 # )
 
 # ret = PG.average_normalized_returns(env, policy, num_trajectories)

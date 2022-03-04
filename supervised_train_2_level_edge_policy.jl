@@ -47,8 +47,7 @@ function PG.reward(env::EdgeFlip.GameEnv)
     return EdgeFlip.reward(env)
 end
 
-function PG.reset!(env::EdgeFlip.GameEnv)
-    nflips = rand(1:42)
+function PG.reset!(env::EdgeFlip.GameEnv; nflips = rand(1:42))
     maxflips = ceil(Int, 1.2nflips)
     EdgeFlip.reset!(env, nflips = nflips, maxflips = maxflips)
 end
@@ -143,23 +142,20 @@ nflips = 8
 maxflips = ceil(Int, 1.2nflips)
 batch_size = 5maxflips
 num_supervised_epochs = 500
-num_rl_epochs = 1000
 sv_learning_rate = 0.001
-rl_learning_rate = 0.0005
-discount = 1.0
 
 env = EdgeFlip.GameEnv(nref, nflips, maxflips = maxflips)
 num_actions = EdgeFlip.number_of_actions(env)
 
 policy = TwoLevelPolicy()
 
-# sv_loss = SV.run_edge_training_loop(
-#     env,
-#     policy,
-#     batch_size,
-#     num_supervised_epochs,
-#     sv_learning_rate,
-# )
+sv_loss = SV.run_edge_training_loop(
+    env,
+    policy,
+    batch_size,
+    num_supervised_epochs,
+    sv_learning_rate,
+)
 
 
 # plot_history(
@@ -170,21 +166,25 @@ policy = TwoLevelPolicy()
 #     filename = "results/supervised/edge-policy/edge-2-sv-loss.png",
 # )
 
+# num_trajectories = 500
+# nflip_range = 1:5:42
+# normalized_nflips = nflip_range ./ num_actions
+# gd_ret = [returns_versus_nflips(nref, nf, num_trajectories) for nf in nflip_range]
+
+
+num_rl_epochs = 5000
+rl_learning_rate = 5e-4
+discount = 1.0
 rl_epochs, rl_loss =
     PG.run_training_loop(env, policy, batch_size, discount, num_rl_epochs, rl_learning_rate)
 
-
-num_trajectories = 500
-nflip_range = 1:5:42
 nn_ret = [returns_versus_nflips(policy, nref, nf, num_trajectories) for nf in nflip_range]
-# gd_ret = [returns_versus_nflips(nref, nf, num_trajectories) for nf in nflip_range]
-# normalized_nflips = nflip_range ./ num_actions
-# plot_returns(normalized_nflips, nn_ret, gd_ret = gd_ret, ylim = [0.75,1])
-plot_returns(
-    normalized_nflips,
-    nn_ret,
-    gd_ret = gd_ret,
-    ylim = [0.75, 1],
-    filename = "results/supervised/edge-policy/ep-2-rl-vs-gd-random-reset-10000.png",
-)
+plot_returns(normalized_nflips, nn_ret, gd_ret = gd_ret, ylim = [0.75,1])
+# plot_returns(
+#     normalized_nflips,
+#     nn_ret,
+#     gd_ret = gd_ret,
+#     ylim = [0.75, 1],
+#     filename = "results/supervised/edge-policy/ep-2-rl-vs-gd.png",
+# )
 
