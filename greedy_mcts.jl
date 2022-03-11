@@ -64,43 +64,42 @@ function returns_vs_nflips(nref, nflips, num_trajectories; maxstepfactor = 1.2)
     return avg
 end
 
-tree_depth = 4
+tree_depth = 3
 nref = 1
 num_trajectories = 500
 nflip_range = 1:5:42
 
 num_actions = EdgeFlip.number_of_edges(EdgeFlip.generate_mesh(nref))
 
-tret = [returns_vs_nflips(nref, nf, tree_depth, num_trajectories) for nf in nflip_range]
+# tret = [returns_vs_nflips(nref, nf, tree_depth, num_trajectories) for nf in nflip_range]
 # gret = [returns_vs_nflips(nref, nf, num_trajectories) for nf in nflip_range]
 
-normalized_nflips = nflip_range ./ num_actions
-plot_returns(
-    normalized_nflips,
-    tret,
-    gd_ret = gret,
-    ylim = [0.8, 1.0],
-    # xlabel = "normalized number ",
-    label = "tree",
-    # filename = "results/tree-search/tree-vs-nflips-d-4.png",
-)
-
-# nflips = 8
-# maxflip_range = 1:0.1:3.0
-# tret = [
-#     returns_vs_nflips(nref, 8, tree_depth, num_trajectories; maxstepfactor = mf) for
-#     mf in maxflip_range
-# ]
-# gret = [
-#     returns_vs_nflips(nref, 8, num_trajectories, maxstepfactor = mf) for mf in maxflip_range
-# ]
-
+# normalized_nflips = nflip_range ./ num_actions
 # plot_returns(
-#     maxflip_range,
+#     normalized_nflips,
 #     tret,
 #     gd_ret = gret,
 #     ylim = [0.8, 1.0],
-#     xlabel = "maxflips/nflips",
 #     label = "tree",
-#     filename = "results/tree-search/tree-vs-maxflipratio.png",
+#     filename = "results/tree-search/tree-vs-nflips-d-4.png",
 # )
+
+nflips = 8
+maxflip_range = 1:0.1:3.0
+tret = [
+    returns_vs_nflips(nref, nflips, tree_depth, num_trajectories; maxstepfactor = mf) for
+    mf in maxflip_range
+]
+gret = [
+    returns_vs_nflips(nref, 8, num_trajectories, maxstepfactor = mf) for mf in maxflip_range
+]
+
+plot_returns(
+    maxflip_range,
+    tret,
+    gd_ret = gret,
+    ylim = [0.8, 1.0],
+    xlabel = "maxflips/nflips",
+    label = "tree",
+    # filename = "results/tree-search/tree-vs-maxflipratio.png",
+)
