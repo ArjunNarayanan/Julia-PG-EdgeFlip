@@ -11,7 +11,7 @@ function plot_history(
     title = "",
     filename = "",
     ylim = [0.0, 1.2],
-    ylabel = "Avg Return"
+    ylabel = "Avg Return",
 )
     fig, ax = subplots()
     ax.plot(epochs, history)
@@ -105,14 +105,23 @@ function plot_returns(nflips, ret, dev; filename = "", ylim = (0.75, 1.0))
     return fig
 end
 
-function plot_returns(nflips, ret; gd_ret = [], filename = "", ylim = (0.75, 1.0), title = "")
+function plot_returns(
+    nflips,
+    ret;
+    gd_ret = [],
+    filename = "",
+    ylim = (0.75, 1.0),
+    title = "",
+    xlabel = "Normalized number of random initial flips",
+    label = "policy"
+)
     fig, ax = subplots()
-    ax.plot(nflips, ret, label = "policy")
+    ax.plot(nflips, ret, label = label)
     if length(gd_ret) > 0
-       ax.plot(nflips, gd_ret, label = "greedy")
+        ax.plot(nflips, gd_ret, label = "greedy")
     end
     ax.legend()
-    ax.set_xlabel("Normalized number of random initial flips")
+    ax.set_xlabel(xlabel)
     ax.set_ylabel("Normalized returns")
     ax.set_title(title)
     ax.set_ylim(ylim)
@@ -127,9 +136,9 @@ function plot_learning_curve!(ax, epochs, returns)
 end
 
 function plot_learning_curves(data;)
-    fig,ax = subplots()
+    fig, ax = subplots()
     for d in data
-        plot_learning_curve!(ax, d[:,1], d[:,2])
+        plot_learning_curve!(ax, d[:, 1], d[:, 2])
     end
     ax.grid()
     # ax.set_ylim(ylim)

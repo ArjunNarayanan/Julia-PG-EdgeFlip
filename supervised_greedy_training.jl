@@ -5,13 +5,14 @@ using Printf
 using EdgeFlip
 
 state(env) = nothing
+reset!(env) = nothing
 
 function collect_training_data!(state_data, greedy_probs, env)
     num_features, num_actions, num_batches = size(state_data)
     @assert size(greedy_probs) == (num_actions, num_batches)
     counter = 1
     while counter <= num_batches
-        EdgeFlip.reset!(env)
+        reset!(env)
         done = EdgeFlip.is_terminated(env)
         if !done
             s = state(env)
@@ -28,7 +29,7 @@ function collect_edge_training_data!(vertex_score, edge_template, greedy_probs, 
     @assert size(greedy_probs) == (num_actions, num_batches)
     counter = 1
     while counter <= num_batches
-        EdgeFlip.reset!(env)
+        reset!(env)
         done = EdgeFlip.is_terminated(env)
         if !done
             vs, et = state(env)
