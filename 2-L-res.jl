@@ -84,61 +84,67 @@ function batch_edge_state(edge_potentials, edge_template, num_edges)
     return cat(es..., dims = 3)
 end
 
+struct EdgeModel
+    emodel::Any
+    bmodel::Any
+    function EdgeModel(in_channels, hidden_channels, out_channels)
+        emodel = Chain(
+            Dense(5in_channels, hidden_channels, relu),
+            Dense(hidden_channels, out_channels, relu),
+        )
+        bmodel = Flux.glorot_uniform(in_channels)
+        new(emodel, bmodel)
+    end
+end
+
+function (p::EdgeModel)(edge_potentials, edge_template)
+    num_edges = size(edge_template, 2)
+
+    ep = cat(edge_potentials, p.bmodel, dims = 2)
+    es = edge_state(ep, edge_template, num_edges)
+
+    return p.emodel(es)
+end
+
+function (p::EdgeModel)(edge_potentials, edge_template, num_batches)
+    num_edges = size(edge_template, 2)
+
+    ep = cat(edge_potentials, repeat(p.bmodel, inner = (1,1,num_batches)), dims = 2)
+    es = batch_edge_state(ep, edge_template, num_edges)
+
+    return p.emodel(es)
+end
+
+Flux.@functor EdgeModel
+
 struct TwoLevelPolicy
-    vmodel::Any
     emodel1::Any
-    bmodel1::Any
     emodel2::Any
-    bmodel2::Any
     function TwoLevelPolicy()
-        vmodel = Chain(Dense(4, 4, relu), Dense(4, 4, relu), Dense(4, 4, relu))
 
-        emodel1 = Chain(Dense(24, 10, relu), Dense(10, 10, relu), Dense(10, 4, relu))
-        bmodel1 = Flux.glorot_uniform(4)
+        emodel1 = EdgeModel(4, 20, 4)
+        emodel2 = EdgeModel(4, 20, 1)
 
-        emodel2 = Chain(Dense(24, 10, relu), Dense(10, 10, relu), Dense(10, 1, relu))
-        bmodel2 = Flux.glorot_uniform(4)
-
-        new(vmodel, emodel1, bmodel1, emodel2, bmodel2)
+        new(emodel1, emodel2)
     end
 end
 
 function (p::TwoLevelPolicy)(state)
     vertex_template_score, edge_template = state
-    num_edges = size(vertex_template_score, 2)
 
-    ep = p.vmodel(vertex_template_score)
-
-    ep = cat(ep, p.bmodel1, dims = 2)
-    es = edge_state(ep, edge_template, num_edges)
-    es = cat(vertex_template_score, es, dims = 1)
-    es = p.emodel1(es)
-
-    es = cat(es, p.bmodel2, dims = 2)
-    es = edge_state(es, edge_template, num_edges)
-    es = cat(vertex_template_score, es, dims = 1)
-
-    logits = p.emodel2(es)
+    ep = p.emodel1(vertex_template_score, edge_template)
+    ep = p.emodel2(ep, edge_template)
+    logits = ep
 
     return logits
 end
 
 function (p::TwoLevelPolicy)(states, num_batches)
     vertex_template_score, edge_template = states
-    num_edges = size(vertex_template_score, 2)
 
-    ep = p.vmodel(vertex_template_score)
-    ep = cat(ep, repeat(p.bmodel1, inner = (1, 1, num_batches)), dims = 2)
-
-    es = batch_edge_state(ep, edge_template, num_edges)
-    es = cat(vertex_template_score, es, dims = 1)
-    es = p.emodel1(es)
-
-    es = cat(es, repeat(p.bmodel2, inner = (1, 1, num_batches)), dims = 2)
-    es = batch_edge_state(es, edge_template, num_edges)
-    es = cat(vertex_template_score, es, dims = 1)
-
-    logits = p.emodel2(es)
+    ep = p.emodel1(vertex_template_score, edge_template, num_batches)
+    ep = p.emodel2(ep, edge_template, num_batches)
+    logits = ep
 
     return logits
 end
@@ -150,7 +156,7 @@ nflips = 8
 maxflips = ceil(Int, 1.2nflips)
 batch_size = 200
 num_supervised_epochs = 500
-sv_learning_rate = 0.001
+sv_learning_rate = 0.01
 
 env = EdgeFlip.GameEnv(nref, nflips, maxflips = maxflips)
 num_actions = EdgeFlip.number_of_actions(env)
@@ -171,13 +177,12 @@ sv_loss = SV.run_edge_training_loop(
 # normalized_nflips = nflip_range ./ num_actions
 
 num_rl_epochs = 1000
-rl_learning_rate = 5e-4
-discount = 0.9
-
+rl_learning_rate = 0.001
+discount = 1.0
 rl_epochs, rl_loss =
     PG.run_training_loop(env, policy, batch_size, discount, num_rl_epochs, rl_learning_rate)
 nn_ret = [returns_versus_nflips(policy, nref, nf, num_trajectories) for nf in nflip_range]
-plot_returns(normalized_nflips, nn_ret, gd_ret = gd_ret, ylim = [0.75,1])
+# plot_returns(normalized_nflips, nn_ret, gd_ret = gd_ret, ylim = [0.75,1])
 # plot_returns(
 #     normalized_nflips,
 #     nn_ret,
