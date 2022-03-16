@@ -50,25 +50,23 @@ nflips = 8
 maxflips = ceil(Int, 1.2nflips)
 env = EdgeFlip.GameEnv(nref, nflips, fixed_reset = false, maxflips = maxflips)
 
-# lr_schedule = Exp
+learning_rate = 0.001
+batch_size = 10maxflips
+discount = 0.8
+num_epochs = 1000
+num_trajectories = 100
 
-# learning_rate = 0.00005
-# batch_size = 10maxflips
-# discount = 0.8
-# num_epochs = 10000
-# num_trajectories = 100
+policy = VertexPolicy()
 
-# policy = VertexPolicy()
-
-# epoch_history, return_history = PG.run_training_loop(
-#     env,
-#     policy,
-#     batch_size,
-#     discount,
-#     num_epochs,
-#     learning_rate,
-#     print_every = 100,
-# )
+epoch_history, return_history = PG.run_training_loop(
+    env,
+    policy,
+    batch_size,
+    discount,
+    num_epochs,
+    learning_rate,
+    print_every = 100,
+)
 
 # include("plot.jl")
 
