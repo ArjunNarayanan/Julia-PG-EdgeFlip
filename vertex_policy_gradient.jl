@@ -57,7 +57,7 @@ function collect_batch_trajectories(env, policy, batch_size, discount)
         if done || length(batch_actions) >= batch_size
             ep_ret = advantage(ep_rewards, discount)
             append!(batch_weights, ep_ret)
-            append!(batch_returns, sum(ep_ret))
+            append!(batch_returns, sum(ep_rewards))
 
             if length(batch_actions) >= batch_size
                 break

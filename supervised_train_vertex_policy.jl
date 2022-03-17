@@ -43,15 +43,15 @@ function PG.reward(env::EdgeFlip.GameEnv)
     return EdgeFlip.reward(env)
 end
 
-# function PG.reset!(env::EdgeFlip.GameEnv; nflips = rand(1:42))
-#     maxflips = ceil(Int, 1.2nflips)
-#     EdgeFlip.reset!(env, nflips = nflips, maxflips = maxflips)
-# end
-
-function PG.reset!(env::EdgeFlip.GameEnv; nflips = env.num_initial_flips)
+function PG.reset!(env::EdgeFlip.GameEnv; nflips = rand(1:42))
     maxflips = ceil(Int, 1.2nflips)
     EdgeFlip.reset!(env, nflips = nflips, maxflips = maxflips)
 end
+
+# function PG.reset!(env::EdgeFlip.GameEnv; nflips = env.num_initial_flips)
+#     maxflips = ceil(Int, 1.2nflips)
+#     EdgeFlip.reset!(env, nflips = nflips, maxflips = maxflips)
+# end
 
 
 function PG.score(env::EdgeFlip.GameEnv)
@@ -94,13 +94,13 @@ sv_loss =
 # normalized_nflips = nflip_range ./ num_actions
 
 num_rl_epochs = 1000
-rl_learning_rate = 1e-3
+rl_learning_rate = 0.01
 discount = 0.99
 
 rl_epochs, rl_loss =
     PG.run_training_loop(env, policy, batch_size, discount, num_rl_epochs, rl_learning_rate)
-# nn_ret = [returns_versus_nflips(policy, nref, nf, num_trajectories) for nf in nflip_range]
-# plot_returns(normalized_nflips, nn_ret, gd_ret = gd_ret, ylim = [0.75,1])
+nn_ret = [returns_versus_nflips(policy, nref, nf, num_trajectories) for nf in nflip_range]
+plot_returns(normalized_nflips, nn_ret, gd_ret = gd_ret, ylim = [0.75,1])
 # plot_returns(
 #     normalized_nflips,
 #     nn_ret,

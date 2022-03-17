@@ -44,36 +44,36 @@ end
 
 Flux.@functor VertexPolicy
 
-nref = 0
-nflips = 1
-maxflips = 1
-# maxflips = ceil(Int, 1.2nflips)
+nref = 1
+nflips = 8
+maxflips = ceil(Int, 1.2nflips)
 env = EdgeFlip.GameEnv(nref, nflips, fixed_reset = false, maxflips = maxflips)
 
-learning_rate = 0.001
+learning_rate = 0.01
 batch_size = 10maxflips
-discount = 0.8
+discount = 1.0
 num_epochs = 1000
 num_trajectories = 100
 
 policy = VertexPolicy()
 
-# epoch_history, return_history = PG.run_training_loop(
-#     env,
-#     policy,
-#     batch_size,
-#     discount,
-#     num_epochs,
-#     learning_rate,
-#     print_every = 100,
-# )
+
+epoch_history, return_history = PG.run_training_loop(
+    env,
+    policy,
+    batch_size,
+    discount,
+    num_epochs,
+    learning_rate,
+    print_every = 100,
+)
 
 # include("plot.jl")
 
-# num_test_trajectories = 1000
-# nn_Avg = PG.average_returns(env, policy, num_test_trajectories)
+num_test_trajectories = 1000
+nn_avg = PG.average_returns(env, policy, num_test_trajectories)
 
-# include("greedy_policy.jl")
-# greedy_avg = GreedyPolicy.average_returns(env, num_test_trajectories)
+include("greedy_policy.jl")
+greedy_avg = GreedyPolicy.average_returns(env, num_test_trajectories)
 # @printf "NN MEAN : %2.3f\n" nn_avg
 # @printf "GD MEAN : %2.3f\n" greedy_avg
