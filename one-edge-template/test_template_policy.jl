@@ -44,25 +44,25 @@ loss_history, return_history =
     run_training_loop(env, policy, batch_size, num_epochs, lr, 1, 100)
 
 
-greedy_optimum = 0.24691358024691357
-fig = plot_history(
-    return_history,
-    optimum = greedy_optimum,
-    # filename = "results\\template-greedy-reward-history.png",
-)
+# greedy_optimum = 0.24691358024691357
+# fig = plot_history(
+#     return_history,
+#     optimum = greedy_optimum,
+#     # filename = "results\\template-greedy-reward-history.png",
+# )
 
-performance = expected_reward(policy)
+# performance = expected_reward(policy)
 
-w,b = params(policy)
+# w,b = params(policy)
 
-states = all_states()
-probs = softmax(policy(states),dims=1)
+# states = all_states()
+# probs = softmax(policy(states),dims=1)
 
-prob_diff = abs.(probs[1,:] - probs[2,:])
+# prob_diff = abs.(probs[1,:] - probs[2,:])
 
-sortidx = sortperm(prob_diff)
-prob_diff = prob_diff[sortidx]
+# sortidx = sortperm(prob_diff)
+# prob_diff = prob_diff[sortidx]
 
-ambiguous_states = states[:,sortidx[1:10]]
-ambiguous_probs = prob_diff[1:10]
-fr = flip_reward(ambiguous_states)
+# ambiguous_states = states[:,sortidx[1:10]]
+# ambiguous_probs = prob_diff[1:10]
+# fr = flip_reward(ambiguous_states)

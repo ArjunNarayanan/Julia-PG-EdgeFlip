@@ -1,5 +1,4 @@
 using Flux
-using Distributions: Categorical
 using EdgeFlip
 using Printf
 include("vertex_policy_gradient.jl")
@@ -45,9 +44,10 @@ end
 
 Flux.@functor VertexPolicy
 
-nref = 1
-nflips = 8
-maxflips = ceil(Int, 1.2nflips)
+nref = 0
+nflips = 1
+maxflips = 1
+# maxflips = ceil(Int, 1.2nflips)
 env = EdgeFlip.GameEnv(nref, nflips, fixed_reset = false, maxflips = maxflips)
 
 learning_rate = 0.001
@@ -58,15 +58,15 @@ num_trajectories = 100
 
 policy = VertexPolicy()
 
-epoch_history, return_history = PG.run_training_loop(
-    env,
-    policy,
-    batch_size,
-    discount,
-    num_epochs,
-    learning_rate,
-    print_every = 100,
-)
+# epoch_history, return_history = PG.run_training_loop(
+#     env,
+#     policy,
+#     batch_size,
+#     discount,
+#     num_epochs,
+#     learning_rate,
+#     print_every = 100,
+# )
 
 # include("plot.jl")
 

@@ -41,7 +41,7 @@ function collect_batch_trajectories(env, policy, batch_size, discount)
     reset!(env)
 
     while true
-        s = state(env)
+        s = deepcopy(state(env))
         logits = policy(s)
         probs = Categorical(vec(softmax(logits, dims = 2)))
         action = rand(probs)
@@ -57,7 +57,7 @@ function collect_batch_trajectories(env, policy, batch_size, discount)
         if done || length(batch_actions) >= batch_size
             ep_ret = advantage(ep_rewards, discount)
             append!(batch_weights, ep_ret)
-            append!(batch_returns, sum(ep_rewards))
+            append!(batch_returns, sum(ep_ret))
 
             if length(batch_actions) >= batch_size
                 break
@@ -119,7 +119,8 @@ end
 function average_returns(env, policy, num_trajectories)
     ret = zeros(num_trajectories)
     for idx = 1:num_trajectories
-        reset!(env, nflips = env.num_initial_flips)
+        # reset!(env, nflips = env.num_initial_flips)
+        reset!(env)
         ret[idx] = single_trajectory_return(env, policy)
     end
     return mean(ret)
