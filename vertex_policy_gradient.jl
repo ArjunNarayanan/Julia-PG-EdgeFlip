@@ -38,6 +38,8 @@ function collect_batch_trajectories(env, policy, batch_size, discount)
     batch_weights = []
     batch_returns = []
 
+    reset!(env)
+
     while true
         s = state(env)
         logits = policy(s)
