@@ -46,7 +46,7 @@ function collect_batch_trajectories(env, policy, batch_size, discount)
     batch_returns = []
 
     while true
-        s = state(env)
+        s = deepcopy(state(env))
         logits = vec(policy(s))
         probs = Categorical(softmax(logits))
         action = rand(probs)
@@ -202,7 +202,7 @@ end
 function average_returns(env, policy, num_trajectories)
     ret = zeros(num_trajectories)
     for idx = 1:num_trajectories
-        reset!(env)
+        reset!(env, nflips = env.num_initial_flips)
         ret[idx] = single_trajectory_return(env, policy)
     end
     return mean(ret)

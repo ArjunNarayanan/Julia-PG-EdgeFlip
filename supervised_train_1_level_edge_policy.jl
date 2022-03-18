@@ -26,6 +26,7 @@ function returns_versus_nflips(nref, nflips, num_trajectories; maxstepfactor = 1
 end
 
 SV.state(env::EdgeFlip.GameEnv) = PG.state(env)
+SV.reset!(env::EdgeFlip.GameEnv) = PG.reset!(env)
 
 function PG.state(env::EdgeFlip.GameEnv)
     vs = EdgeFlip.vertex_template_score(env)
@@ -87,7 +88,7 @@ struct EdgePolicy
     function EdgePolicy()
         vmodel = Chain(Dense(4, 4, relu), Dense(4, 4, relu), Dense(4, 4, relu))
 
-        emodel = Chain(Dense(20, 10, relu), Dense(10, 10, relu), Dense(10, 1, relu))
+        emodel = Chain(Dense(20, 10, relu), Dense(10, 10, relu), Dense(10, 1))
         bmodel = Flux.glorot_uniform(4)
 
         new(vmodel, emodel, bmodel)
@@ -123,16 +124,14 @@ end
 Flux.@functor EdgePolicy
 
 nref = 1
-nflips = 8
-maxflips = ceil(Int, 1.2nflips)
-batch_size = 5maxflips
+batch_size = 100
 num_supervised_epochs = 500
-sv_learning_rate = 0.001
+sv_learning_rate = 0.01
 
-env = EdgeFlip.GameEnv(nref, nflips, maxflips = maxflips)
+env = EdgeFlip.GameEnv(nref,0)
 num_actions = EdgeFlip.number_of_actions(env)
 
-# policy = EdgePolicy()
+policy = EdgePolicy()
 
 # sv_loss = SV.run_edge_training_loop(
 #     env,
@@ -147,18 +146,19 @@ num_actions = EdgeFlip.number_of_actions(env)
 # gd_ret = [returns_versus_nflips(nref, nf, num_trajectories) for nf in nflip_range]
 # normalized_nflips = nflip_range ./ num_actions
 
-num_rl_epochs = 5000
-rl_learning_rate = 1e-3
-discount = 0.9
-rl_epochs, rl_loss =
-    PG.run_training_loop(env, policy, batch_size, discount, num_rl_epochs, rl_learning_rate)
-nn_ret = [returns_versus_nflips(policy, nref, nf, num_trajectories) for nf in nflip_range]
-plot_returns(normalized_nflips, nn_ret, gd_ret = gd_ret, ylim = [0.75, 1])
-plot_returns(
-    normalized_nflips,
-    nn_ret,
-    gd_ret = gd_ret,
-    ylim = [0.75, 1],
-    filename = "results/supervised/edge-policy/ep-1-rl-vs-gd-2.png",
-)
+# num_rl_epochs = 5000
+# rl_learning_rate = 0.005
+# discount = 0.99
+
+# rl_epochs, rl_loss =
+#     PG.run_training_loop(env, policy, batch_size, discount, num_rl_epochs, rl_learning_rate)
+# nn_ret = [returns_versus_nflips(policy, nref, nf, num_trajectories) for nf in nflip_range]
+# plot_returns(normalized_nflips, nn_ret, gd_ret = gd_ret, ylim = [0.75, 1])
+# plot_returns(
+#     normalized_nflips,
+#     nn_ret,
+#     gd_ret = gd_ret,
+#     ylim = [0.75, 1],
+#     filename = "results/supervised/edge-policy/ep-1-rl-vs-gd-2.png",
+# )
 

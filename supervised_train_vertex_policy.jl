@@ -26,6 +26,7 @@ function returns_versus_nflips(nref, nflips, num_trajectories; maxstepfactor = 1
 end
 
 SV.state(env::EdgeFlip.GameEnv) = EdgeFlip.vertex_template_score(env)
+SV.reset!(env::EdgeFlip.GameEnv) = PG.reset!(env)
 
 function PG.state(env::EdgeFlip.GameEnv)
     return EdgeFlip.vertex_template_score(env)
@@ -48,12 +49,6 @@ function PG.reset!(env::EdgeFlip.GameEnv; nflips = rand(1:42))
     EdgeFlip.reset!(env, nflips = nflips, maxflips = maxflips)
 end
 
-# function PG.reset!(env::EdgeFlip.GameEnv; nflips = env.num_initial_flips)
-#     maxflips = ceil(Int, 1.2nflips)
-#     EdgeFlip.reset!(env, nflips = nflips, maxflips = maxflips)
-# end
-
-
 function PG.score(env::EdgeFlip.GameEnv)
     return EdgeFlip.score(env)
 end
@@ -61,8 +56,8 @@ end
 struct VertexPolicy
     model::Any
     function VertexPolicy()
-        # model = Chain(Dense(4, 20, relu), Dense(20, 20, relu), Dense(20, 1))
-        model = Chain(Dense(4,1))
+        model = Chain(Dense(4, 4, relu), Dense(4, 4, relu), Dense(4, 1))
+        # model = Chain(Dense(4,1))
         new(model)
     end
 end
@@ -74,28 +69,26 @@ end
 Flux.@functor VertexPolicy
 
 nref = 1
-nflips = 8
-maxflips = ceil(Int, 1.2nflips)
-batch_size = 200
+batch_size = 100
 num_supervised_epochs = 500
-sv_learning_rate = 1e-3
+sv_learning_rate = 1e-2
 
-env = EdgeFlip.GameEnv(nref, nflips, maxflips = maxflips)
+env = EdgeFlip.GameEnv(nref, 0)
 num_actions = EdgeFlip.number_of_actions(env)
 
 policy = VertexPolicy()
 
-sv_loss =
-    SV.run_training_loop(env, policy, batch_size, num_supervised_epochs, sv_learning_rate)
+# sv_loss =
+#     SV.run_training_loop(env, policy, batch_size, num_supervised_epochs, sv_learning_rate)
 
 # num_trajectories = 500
 # nflip_range = 1:5:42
 # gd_ret = [returns_versus_nflips(nref, nf, num_trajectories) for nf in nflip_range]
 # normalized_nflips = nflip_range ./ num_actions
 
-num_rl_epochs = 1000
-rl_learning_rate = 0.01
-discount = 0.99
+num_rl_epochs = 500
+rl_learning_rate = 2e-3
+discount = 1.0
 
 rl_epochs, rl_loss =
     PG.run_training_loop(env, policy, batch_size, discount, num_rl_epochs, rl_learning_rate)
