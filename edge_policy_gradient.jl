@@ -12,8 +12,8 @@ reward(env) = nothing
 is_terminated(env) = nothing
 reset!(env) = nothing
 score(env) = nothing
-eval_single_state(policy, state) = nothing
-eval_batch_state(policy, state) = nothing
+eval_single(policy, state) = nothing
+eval_batch(policy, state) = nothing
 
 function policy_gradient_loss(
     ets,
@@ -23,7 +23,7 @@ function policy_gradient_loss(
     actions,
     weights,
 )
-    logits = eval_batch_state(policy, ets, econn, epairs)
+    logits = eval_batch(policy, ets, econn, epairs)
     logp = logsoftmax(logits, dims = 2)
     selected_logp = -[logp[1, action, idx] for (idx, action) in enumerate(actions)]
     loss = Flux.mean(selected_logp .* weights)
@@ -57,7 +57,7 @@ function collect_batch_trajectories(env, policy, batch_size, discount)
 
     while true
         ets, econn, epairs = state(env)
-        logits = vec(eval_single_state(policy, ets, econn, epairs))
+        logits = vec(eval_single(policy, ets, econn, epairs))
         probs = Categorical(softmax(logits))
         action_index = rand(probs)
 
@@ -119,9 +119,9 @@ function single_trajectory_return(env, policy)
     else
         while !done
             ets, econn, epairs = state(env)
-            probs = softmax(vec(eval_single_state(policy, ets, econn, epairs)))
+            probs = softmax(vec(eval_single(policy, ets, econn, epairs)))
             action_index = rand(Categorical(probs))
-            
+
             action = idx_to_action(action_index)
             step!(env, action)
             push!(ep_returns, reward(env))
