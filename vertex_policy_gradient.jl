@@ -155,13 +155,44 @@ function run_training_loop(
 
         if epoch % print_every == 0
             statement =
-            @sprintf "epoch: %3d \t loss: %.4f \t avg return: %3.2f" epoch loss avg_return
+                @sprintf "epoch: %3d \t loss: %.4f \t avg return: %3.2f" epoch loss avg_return
             println(statement)
         end
     end
     return epoch_history, return_history
 end
 
+function run_training_loop_with_evaluation(
+    env,
+    policy,
+    batch_size,
+    discount,
+    num_epochs,
+    learning_rate;
+    evaluate_every = 1000,
+    num_trajectories = 500,
+)
+
+    optimizer = ADAM(learning_rate)
+    return_history = []
+    epoch_history = []
+
+    for epoch in 1:num_epochs
+        loss, avg_return = step_epoch(env, policy, optimizer, batch_size, discount)
+
+        if epoch % evaluate_every == 0
+            reset!(env, nflips = 8)
+            ret = average_normalized_returns(env, policy, num_trajectories)
+            push!(return_history, ret)
+            push!(epoch_history, epoch)
+
+            statement =
+                @sprintf "epoch: %3d \t loss: %.4f \t avg return: %3.2f" epoch loss ret
+            println(statement)
+        end
+    end
+    return epoch_history, return_history
+end
 
 
 end
