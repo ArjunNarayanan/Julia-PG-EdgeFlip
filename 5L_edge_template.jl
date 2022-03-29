@@ -184,11 +184,11 @@ policy = Policy5L()
 # normalized_nflips = nflip_range ./ num_actions
 
 
-num_epochs = 1000
+num_epochs = 5000
 num_trajectories = 500
 batch_size = 100
 discount = 1.0
-learning_rate = 1e-3
+learning_rate = 2e-4
 
 PG.run_training_loop(env, policy, batch_size, discount, num_epochs, learning_rate)
 nn_ret = [returns_versus_nflips(policy, nref, nf, num_trajectories) for nf in nflip_range]
