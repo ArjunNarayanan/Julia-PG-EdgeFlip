@@ -23,18 +23,27 @@ function collect_training_data!(state_data, greedy_probs, env)
     end
 end
 
-function collect_edge_training_data!(vertex_score, edge_template, greedy_probs, env)
-    _, num_actions, num_batches = size(vertex_score)
-    @assert size(edge_template) == (5, num_actions, num_batches)
+function collect_edge_training_data!(
+    edge_template_score,
+    edge_connectivity,
+    edge_pairs,
+    greedy_probs,
+    env,
+)
+    _, num_actions, num_batches = size(edge_template_score)
+    @assert length(edge_connectivity) == 3num_actions
+    @assert size(edge_pairs) == (num_actions, num_batches)
     @assert size(greedy_probs) == (num_actions, num_batches)
+    
     counter = 1
+    edge_connectivity .= env.edge_connectivity
     while counter <= num_batches
         reset!(env)
         done = EdgeFlip.is_terminated(env)
         if !done
-            vs, et = state(env)
-            vertex_score[:, :, counter] .= vs
-            edge_template[:, :, counter] .= et
+            ets, econn, epairs = state(env)
+            edge_template_score[:, :, counter] .= ets
+            edge_pairs[:, counter] .= epairs
             greedy_probs[:, counter] .= greedy_action_distribution(env)
             counter += 1
         end
@@ -99,21 +108,24 @@ function run_edge_training_loop(
     loss_history = zeros(num_epochs)
 
     na = EdgeFlip.number_of_actions(env)
-    vertex_score = zeros(Int, 4, na, batch_size)
-    edge_template = zeros(Int, 5, na, batch_size)
+
+    edge_template_score = zeros(Int, 4, na, batch_size)
+    edge_connectivity = zeros(Int, na)
+    edge_pairs = zeros(Int, na, batch_size)
     greedy_probs = zeros(na, batch_size)
 
     optimizer = ADAM(learning_rate)
 
     for epoch = 1:num_epochs
-        collect_edge_training_data!(vertex_score, edge_template, greedy_probs, env)
+        collect_edge_training_data!(edge_template_score, edge_connectivity, edge_pairs, greedy_probs, env)
 
         theta = Flux.params(policy)
         loss = 0.0
 
         loss = 0.0
         grads = Flux.gradient(theta) do
-            logits = reshape(policy((vertex_score, edge_template), batch_size), na, batch_size)
+            logits = eval_batch(policy, edge_template_score, edge_connectivity, edge_pairs)
+            logits = reshape(logits, na, batch_size)
             loss = Flux.logitcrossentropy(logits, greedy_probs)
         end
 
