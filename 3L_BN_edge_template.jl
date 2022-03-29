@@ -1,13 +1,12 @@
 using Printf
 using Flux
 using EdgeFlip
-include("supervised_greedy_training.jl")
+# include("supervised_greedy_training.jl")
 include("edge_policy_gradient.jl")
 include("greedy_policy.jl")
 include("plot.jl")
 
 PG = EdgePolicyGradient
-SV = Supervised
 
 function returns_versus_nflips(policy, nref, nflips, num_trajectories; maxstepfactor = 1.2)
     maxflips = ceil(Int, maxstepfactor * nflips)
@@ -36,9 +35,6 @@ function PG.state(env::EdgeFlip.OrderedGameEnv)
     return ets, econn, epairs
 end
 
-SV.state(env::EdgeFlip.OrderedGameEnv) = PG.state(env)
-SV.reset!(env::EdgeFlip.OrderedGameEnv) = PG.reset!(env)
-
 function PG.step!(env::EdgeFlip.OrderedGameEnv, action)
     triangle, vertex = action
     EdgeFlip.step!(env, triangle, vertex)
@@ -64,10 +60,12 @@ end
 struct EdgeModel
     model::Any
     bvals::Any
+    batchnorm
     function EdgeModel(in_channels, out_channels)
         model = Dense(3in_channels, out_channels)
         bvals = Flux.glorot_uniform(in_channels)
-        new(model, bvals)
+        batchnorm = BatchNorm(out_channels)
+        new(model, bvals, batchnorm)
     end
 end
 
@@ -82,6 +80,9 @@ function eval_single(em::EdgeModel, ep, econn, epairs)
 
     ep2 = ep[:, epairs]
     ep = 0.5 * (ep + ep2)
+
+    ep = em.batchnorm(ep)
+
     return ep
 end
 
@@ -95,74 +96,57 @@ function eval_batch(em::EdgeModel, ep, econn, epairs)
     ep2 = cat([ep[:, epairs[:, b], b] for b = 1:nb]..., dims = 3)
     ep = 0.5 * (ep + ep2)
 
+    nf, na, nb = size(ep)
+    ep = reshape(ep, nf, :)
+    ep = em.batchnorm(ep)
+    ep = reshape(ep, nf, na, nb)
+
     return ep
 end
 
-struct Policy5L
+struct Policy3L
     emodel1::Any
     emodel2::Any
     emodel3::Any
-    emodel4
-    emodel5
     lmodel::Any
-    function Policy5L()
-        emodel1 = EdgeModel(4, 8)
-        emodel2 = EdgeModel(8, 8)
-        emodel3 = EdgeModel(8, 8)
-        emodel4 = EdgeModel(8, 8)
-        emodel5 = EdgeModel(8, 8)
-        lmodel = Dense(8, 1)
-        new(emodel1, emodel2, emodel3, emodel4, emodel5, lmodel)
+    function Policy3L()
+        emodel1 = EdgeModel(4, 16)
+        emodel2 = EdgeModel(16, 16)
+        emodel3 = EdgeModel(16, 16)
+        lmodel = Dense(16, 1)
+        new(emodel1, emodel2, emodel3, lmodel)
     end
 end
 
-Flux.@functor Policy5L
+Flux.@functor Policy3L
 
-function PG.eval_single(p::Policy5L, ep, econn, epairs)
+function PG.eval_single(p::Policy3L, ep, econn, epairs)
     x = eval_single(p.emodel1, ep, econn, epairs)
     x = relu.(x)
 
     y = eval_single(p.emodel2, x, econn, epairs)
-    y = x + y
-    x = relu.(y)
+    y = relu.(y)
 
-    y = eval_single(p.emodel3, x, econn, epairs)
+    y = eval_single(p.emodel3, y, econn, epairs)
     y = x + y
-    x = relu.(y)
+    y = relu.(y)
 
-    y = eval_single(p.emodel4, x, econn, epairs)
-    y = x + y
-    x = relu.(y)
-
-    y = eval_single(p.emodel5, x, econn, epairs)
-    y = x + y
-    x = relu.(y)
-
-    logits = p.lmodel(x)
+    logits = p.lmodel(y)
     return logits
 end
 
-function PG.eval_batch(p::Policy5L, ep, econn, epairs)
+function PG.eval_batch(p::Policy3L, ep, econn, epairs)
     x = eval_batch(p.emodel1, ep, econn, epairs)
     x = relu.(x)
 
     y = eval_batch(p.emodel2, x, econn, epairs)
-    y = x + y
-    x = relu.(y)
+    y = relu.(y)
 
-    y = eval_batch(p.emodel3, x, econn, epairs)
+    y = eval_batch(p.emodel3, y, econn, epairs)
     y = x + y
-    x = relu.(y)
+    y = relu.(y)
 
-    y = eval_batch(p.emodel4, x, econn, epairs)
-    y = x + y
-    x = relu.(y)
-
-    y = eval_batch(p.emodel5, x, econn, epairs)
-    y = x + y
-    x = relu.(y)
-
-    logits = p.lmodel(x)
+    logits = p.lmodel(y)
     return logits
 end
 
@@ -170,39 +154,28 @@ nref = 1
 
 env = EdgeFlip.OrderedGameEnv(nref, 0)
 num_actions = EdgeFlip.number_of_actions(env)
-policy = Policy5L()
+policy = Policy3L()
 
 # PG.reset!(env)
 # ep, econn, epairs = PG.state(env)
 # l = PG.eval_single(policy, ep, econn, epairs)
-bs, ba, bw, ret = PG.collect_batch_trajectories(env, policy, 10, 1.0)
+# bs, ba, bw, ret = PG.collect_batch_trajectories(env, policy, 10, 1.0)
 # l = PG.eval_batch(policy, bs[1], bs[2], bs[3])
-
-bn = BatchNorm(8)
-
-ets, econn, epairs = bs
-x = eval_batch(policy.emodel1, ets, econn, epairs)
-x = relu.(x)
-nf, na, nb = size(x)
-x = reshape(x, nf, :)
-x = bn(x)
-x = reshape(x, nf, na, nb)
 
 # num_trajectories = 500
 # nflip_range = 1:5:42
 # gd_ret = [returns_versus_nflips(nref, nf, num_trajectories) for nf in nflip_range]
 # normalized_nflips = nflip_range ./ num_actions
 
+num_epochs = 5000
+num_trajectories = 500
+batch_size = 100
+discount = 1.0
+learning_rate = 2e-3
 
-# num_epochs = 5000
-# num_trajectories = 500
-# batch_size = 100
-# discount = 1.0
-# learning_rate = 2e-4
+PG.run_training_loop(env, policy, batch_size, discount, num_epochs, learning_rate)
+nn_ret = [returns_versus_nflips(policy, nref, nf, num_trajectories) for nf in nflip_range]
+plot_returns(normalized_nflips, nn_ret, gd_ret = gd_ret, ylim = [0.75, 1])
 
-# PG.run_training_loop(env, policy, batch_size, discount, num_epochs, learning_rate)
-# nn_ret = [returns_versus_nflips(policy, nref, nf, num_trajectories) for nf in nflip_range]
-# plot_returns(normalized_nflips, nn_ret, gd_ret = gd_ret, ylim = [0.75, 1])
-
-# filename = "results/new-edge-model/5L-res-performance.png"
+# filename = "results/new-edge-model/3L-res-performance.png"
 # plot_returns(normalized_nflips, nn_ret, gd_ret = gd_ret, ylim = [0.75, 1], filename = filename)
