@@ -115,13 +115,14 @@ function PG.eval_single(p::Policy3L, ep, econn, epairs)
     x = relu.(x)
 
     y = eval_single(p.emodel2, x, econn, epairs)
-    y = relu.(y)
-
-    y = eval_single(p.emodel3, y, econn, epairs)
     y = x + y
-    y = relu.(y)
+    x = relu.(y)
 
-    logits = p.lmodel(y)
+    y = eval_single(p.emodel3, x, econn, epairs)
+    y = x + y
+    x = relu.(y)
+
+    logits = p.lmodel(x)
     return logits
 end
 
@@ -130,13 +131,14 @@ function PG.eval_batch(p::Policy3L, ep, econn, epairs)
     x = relu.(x)
 
     y = eval_batch(p.emodel2, x, econn, epairs)
-    y = relu.(y)
-
-    y = eval_batch(p.emodel3, y, econn, epairs)
     y = x + y
-    y = relu.(y)
+    x = relu.(y)
 
-    logits = p.lmodel(y)
+    y = eval_batch(p.emodel3, x, econn, epairs)
+    y = x + y
+    x = relu.(y)
+
+    logits = p.lmodel(x)
     return logits
 end
 
@@ -158,10 +160,10 @@ policy = Policy3L()
 # normalized_nflips = nflip_range ./ num_actions
 
 num_epochs = 5000
-# num_trajectories = 500
-# batch_size = 100
-# discount = 1.0
-learning_rate = 5e-4
+num_trajectories = 500
+batch_size = 100
+discount = 1.0
+learning_rate = 2e-3
 
 PG.run_training_loop(env, policy, batch_size, discount, num_epochs, learning_rate)
 nn_ret = [returns_versus_nflips(policy, nref, nf, num_trajectories) for nf in nflip_range]
