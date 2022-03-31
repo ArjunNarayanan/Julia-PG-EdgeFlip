@@ -199,5 +199,19 @@ function step_tree_search!(env, tree_depth)
     return maxr
 end
 
+function single_trajectory_return(env, tree_depth)
+    initial_score = EdgeFlip.score(env)
+    done = EdgeFlip.is_terminated(env)
+    if done
+        return 0.0
+    else
+        while !done
+            step_tree_search!(env, tree_depth)
+            done = EdgeFlip.is_terminated(env)
+        end
+        final_score = EdgeFlip.score(env)
+        return initial_score - final_score
+    end
+end
 
 end

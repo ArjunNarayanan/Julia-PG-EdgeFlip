@@ -83,10 +83,13 @@ function circlemesh(hmax)
   θ = 2π*(0:n)'./n
   pv = vcat(cos.(θ), sin.(θ))
   p,t = polytrimesh([pv], [], hmax, "puYQ")
+  p = Array(transpose(p))
+  t = Array(transpose(t))
+  return p, t
 end
 
 #p,t = samplemesh1()
 #trimesh(p[1,:], p[2,:], t, aspect_ratio=:equal)
 
-p,t = circlemesh(0.4)
-trimesh(p[1,:], p[2,:], t, aspect_ratio=:equal)
+# p,t = circlemesh(0.4)
+# trimesh(p[1,:], p[2,:], t, aspect_ratio=:equal)
