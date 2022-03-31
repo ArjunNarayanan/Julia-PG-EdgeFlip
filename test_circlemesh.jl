@@ -2,8 +2,10 @@ using EdgeFlip
 using MeshPlotter
 include("tri.jl")
 include("greedy_policy.jl")
+include("tree_search.jl")
 
 GP = GreedyPolicy
+TS = TreeSearch
 
 function normalized_returns_vs_polygon_degree(element_size)
     p, t = circlemesh(element_size)
@@ -41,32 +43,33 @@ function optimum_score_vs_polygon_degree(element_size)
 end
 
 
-# element_size = 0.3
-# p, t = circlemesh(element_size)
-# mesh = EdgeFlip.Mesh(p, t)
-# num_nodes = size(p, 1)
-# num_edges = EdgeFlip.number_of_edges(mesh)
-# d0 = fill(6, num_nodes)
-# d0[mesh.bnd_nodes] .= 4
+element_size = 0.3
+p, t = circlemesh(element_size)
+mesh = EdgeFlip.Mesh(p, t)
+num_nodes = size(p, 1)
+num_edges = EdgeFlip.number_of_edges(mesh)
+d0 = fill(6, num_nodes)
+d0[mesh.bnd_nodes] .= 4
 
-# polygon_degree = length(mesh.bnd_nodes)
-# maxflips = ceil(Int,2num_edges)
-# env = EdgeFlip.GameEnv(mesh, 0, d0 = d0, fixed_reset = true, maxflips = num_edges)
-# optimum_score = env.score - abs(sum(env.vertex_score))
+maxflips = ceil(Int,2num_edges)
+env = EdgeFlip.GameEnv(mesh, 0, d0 = d0, fixed_reset = true, maxflips = num_edges)
+
+
+TS.step_tree_search!(env, 2)
+root = TS.Node()
+TS.grow_at!(root, env, 2)
+
+
+
+
+# num_trajectories = 500
+# tree_depth = 2
+# gret = GP.average_normalized_returns(env, num_trajectories)
+# tret = TS.average_normalized_returns(env, 2, num_trajectories)
 
 # num_trajectories = 500
 # ret = GP.average_returns(env, num_trajectories)
 # normalized_return = optimum_score == 0.0 ? 1.0 : ret / optimum_score
-
-
-
-
-
-
-
-
-
-
 
 # element_size = [0.8,0.7,0.6,0.5,0.4,0.3]
 # vals = normalized_returns_vs_polygon_degree.(element_size)
