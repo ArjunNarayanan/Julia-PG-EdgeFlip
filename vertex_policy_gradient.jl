@@ -13,6 +13,8 @@ is_terminated(env) = nothing
 reset!(env) = nothing
 score(env) = nothing
 
+optimum_score(env) = env.optimum_score
+
 function policy_gradient_loss(states, policy, actions, weights)
     logits = policy(states)
     logp = logsoftmax(logits, dims = 2)
@@ -90,39 +92,31 @@ function step_epoch(env, policy, optimizer, batch_size, discount)
 end
 
 function single_trajectory_return(env, policy)
-    ep_returns = []
     done = is_terminated(env)
     if done
         return 0.0
     else
+        initial_score = score(env)
+        minscore = initial_score
         while !done
             probs = vec(softmax(policy(state(env)), dims = 2))
             action = rand(Categorical(probs))
             step!(env, action)
-            push!(ep_returns, reward(env))
+            minscore = min(minscore, score(env))
             done = is_terminated(env)
         end
-        return sum(ep_returns)
+        return initial_score - minscore
     end
 end
 
 function single_trajectory_normalized_return(env, policy)
-    maxscore = score(env)
-    if maxscore == 0
-        return 0.0
+    maxreturn = score(env) - optimum_score(env)
+    if maxreturn == 0
+        return 1.0
     else
         ret = single_trajectory_return(env, policy)
-        return ret / maxscore
+        return ret / maxreturn
     end
-end
-
-function average_returns(env, policy, num_trajectories)
-    ret = zeros(num_trajectories)
-    for idx = 1:num_trajectories
-        reset!(env, nflips = env.num_initial_flips)
-        ret[idx] = single_trajectory_return(env, policy)
-    end
-    return mean(ret)
 end
 
 function average_normalized_returns(env, policy, num_trajectories)

@@ -114,11 +114,12 @@ function step_epoch(env, policy, optimizer, batch_size, discount)
 end
 
 function single_trajectory_return(env, policy)
-    ep_returns = []
     done = is_terminated(env)
     if done
         return 0.0
     else
+        initial_score = score(env)
+        minscore = initial_score
         while !done
             ets, econn, epairs = state(env)
             probs = softmax(vec(eval_single(policy, ets, econn, epairs)))
@@ -126,20 +127,21 @@ function single_trajectory_return(env, policy)
 
             action = idx_to_action(action_index)
             step!(env, action)
-            push!(ep_returns, reward(env))
+
+            minscore = min(minscore, score(env))
             done = is_terminated(env)
         end
-        return sum(ep_returns)
+        return initial_score - minscore
     end
 end
 
 function single_trajectory_normalized_return(env, policy)
-    maxscore = score(env)
-    if maxscore == 0
-        return 0.0
+    maxreturn = score(env) - env.optimum_score
+    if maxreturn == 0
+        return 1.0
     else
         ret = single_trajectory_return(env, policy)
-        return ret / maxscore
+        return ret / maxreturn
     end
 end
 
