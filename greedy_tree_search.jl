@@ -9,45 +9,6 @@ include("plot.jl")
 
 TS = TreeSearch
 
-function single_trajectory_return(env, tree_depth)
-    initial_score = EdgeFlip.score(env)
-    done = EdgeFlip.is_terminated(env)
-    if done
-        return 0.0
-    else
-        while !done
-            TS.step_tree_search!(env, tree_depth)
-            done = EdgeFlip.is_terminated(env)
-        end
-        final_score = EdgeFlip.score(env)
-        return initial_score - final_score
-    end
-end
-
-function single_trajectory_normalized_return(env, tree_depth)
-    maxscore = EdgeFlip.score(env)
-    if maxscore == 0
-        return 1.0
-    else
-        ret = single_trajectory_return(env, tree_depth)
-        return ret / maxscore
-    end
-end
-
-function normalized_returns(env, tree_depth, num_trajectories)
-    ret = zeros(num_trajectories)
-    for idx = 1:num_trajectories
-        EdgeFlip.reset!(env)
-        ret[idx] = single_trajectory_normalized_return(env, tree_depth)
-    end
-    return ret
-end
-
-function average_normalized_returns(env, tree_depth, num_trajectories)
-    ret = normalized_returns(env, tree_depth, num_trajectories)
-    return sum(ret) / length(ret)
-end
-
 function returns_vs_nflips(nref, nflips, tree_depth, num_trajectories; maxstepfactor = 1.2)
     maxflips = ceil(Int, maxstepfactor * nflips)
     env = EdgeFlip.GameEnv(nref, nflips, maxflips = maxflips)

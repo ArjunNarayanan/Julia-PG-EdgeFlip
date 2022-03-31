@@ -41,22 +41,22 @@ function optimum_score_vs_polygon_degree(element_size)
 end
 
 
-element_size = 0.3
-p, t = circlemesh(element_size)
-mesh = EdgeFlip.Mesh(p, t)
-num_nodes = size(p, 1)
-num_edges = EdgeFlip.number_of_edges(mesh)
-d0 = fill(6, num_nodes)
-d0[mesh.bnd_nodes] .= 4
+# element_size = 0.3
+# p, t = circlemesh(element_size)
+# mesh = EdgeFlip.Mesh(p, t)
+# num_nodes = size(p, 1)
+# num_edges = EdgeFlip.number_of_edges(mesh)
+# d0 = fill(6, num_nodes)
+# d0[mesh.bnd_nodes] .= 4
 
-polygon_degree = length(mesh.bnd_nodes)
-maxflips = ceil(Int,2num_edges)
-env = EdgeFlip.GameEnv(mesh, 0, d0 = d0, fixed_reset = true, maxflips = num_edges)
-optimum_score = env.score - abs(sum(env.vertex_score))
+# polygon_degree = length(mesh.bnd_nodes)
+# maxflips = ceil(Int,2num_edges)
+# env = EdgeFlip.GameEnv(mesh, 0, d0 = d0, fixed_reset = true, maxflips = num_edges)
+# optimum_score = env.score - abs(sum(env.vertex_score))
 
-num_trajectories = 500
-ret = GP.average_returns(env, num_trajectories)
-normalized_return = optimum_score == 0.0 ? 1.0 : ret / optimum_score
+# num_trajectories = 500
+# ret = GP.average_returns(env, num_trajectories)
+# normalized_return = optimum_score == 0.0 ? 1.0 : ret / optimum_score
 
 
 

@@ -31,6 +31,10 @@ function greedy_action(env)
     return rand(greedy_actions(env))
 end
 
+function optimum_score(env)
+    return env.optimum_score
+end
+
 function greedy_actions(env)
     num_actions = EdgeFlip.number_of_actions(env)
     rewards = [EdgeFlip.reward(env,e) for e in 1:num_actions]
@@ -56,28 +60,30 @@ function action_probabilities(env)
 end
 
 function single_trajectory_return(env)
-    ep_returns = []
     done = is_terminated(env)
     if done
         return 0.0
     else
+        initial_score = score(env)
+        minscore = initial_score
         while !done
             action = greedy_action(env)
             step!(env, action)
-            push!(ep_returns, reward(env))
+            minscore = min(minscore,score(env))
             done = is_terminated(env)
         end
-        return sum(ep_returns)
+        ret = initial_score - minscore
+        return ret
     end
 end
 
 function single_trajectory_normalized_return(env)
-    maxscore = score(env)
-    if maxscore == 0
+    maxreturn = score(env) - optimum_score(env)
+    if maxreturn == 0
         return 1.0
     else
         ret = single_trajectory_return(env)
-        return ret/maxscore
+        return ret/maxreturn
     end
 end
 
@@ -101,12 +107,7 @@ function average_returns(env, num_trajectories)
 end
 
 function average_normalized_returns(env, num_trajectories)
-    ret = zeros(num_trajectories)
-    for idx in 1:num_trajectories
-        reset!(env)
-        ret[idx] = single_trajectory_normalized_return(env)
-    end
-    return mean(ret)
+    return mean(normalized_returns(env, num_trajectories))
 end
 
 end
