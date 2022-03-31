@@ -1,5 +1,6 @@
 module TreeSearch
 
+using Random
 using EdgeFlip
 
 struct Node
@@ -126,9 +127,15 @@ function is_terminal(env, action)
     return terminal
 end
 
-function expand!(parent, env)
+function expand!(parent, env, max_branching_factor)
     rewards = all_rewards(env)
     actions = findall(rewards .== maximum(rewards))
+
+    if length(actions) > max_branching_factor
+        idx = randperm(length(actions))[1:max_branching_factor]
+        actions = actions[idx]
+    end
+
     rewards = rewards[actions]
     terminated = [is_terminal(env, a) for a in actions]
     for (a, r, t) in zip(actions, rewards, terminated)
@@ -151,16 +158,16 @@ function level_up!(child, env)
     return p
 end
 
-function grow_at!(node, env, tree_depth)
+function grow_at!(node, env, tree_depth, max_branching_factor)
     if has_children(node)
         for idx = 1:num_children(node)
             child = level_down!(node, env, idx)
-            grow_at!(child, env, tree_depth)
+            grow_at!(child, env, tree_depth, max_branching_factor)
             level_up!(child, env)
         end
     elseif node.data[:level] < tree_depth && !node.data[:terminal]
-        expand!(node, env)
-        grow_at!(node, env, tree_depth)
+        expand!(node, env, max_branching_factor)
+        grow_at!(node, env, tree_depth, max_branching_factor)
     else
         return
     end
@@ -190,16 +197,16 @@ function step_best_trajectory!(env, node)
     end
 end
 
-function step_tree_search!(env, tree_depth)
+function step_tree_search!(env, tree_depth, max_branching_factor)
     root = Node()
-    grow_at!(root, env, tree_depth)
+    grow_at!(root, env, tree_depth, max_branching_factor)
     collect_returns!(root)
     maxr = max_return(root)
     step_best_trajectory!(env, root)
     return maxr
 end
 
-function single_trajectory_return(env, tree_depth)
+function single_trajectory_return(env, tree_depth, max_branching_factor)
     done = EdgeFlip.is_terminated(env)
     if done
         return 0.0
@@ -207,7 +214,7 @@ function single_trajectory_return(env, tree_depth)
         initial_score = EdgeFlip.score(env)
         minscore = initial_score
         while !done
-            step_tree_search!(env, tree_depth)
+            step_tree_search!(env, tree_depth, max_branching_factor)
             minscore = min(minscore, EdgeFlip.score(env))
             done = EdgeFlip.is_terminated(env)
         end
@@ -215,27 +222,27 @@ function single_trajectory_return(env, tree_depth)
     end
 end
 
-function single_trajectory_normalized_return(env, tree_depth)
+function single_trajectory_normalized_return(env, tree_depth, max_branching_factor)
     maxreturn = EdgeFlip.score(env) - env.optimum_score
     if maxreturn == 0
         return 1.0
     else
-        ret = single_trajectory_return(env, tree_depth)
+        ret = single_trajectory_return(env, tree_depth, max_branching_factor)
         return ret / maxreturn
     end
 end
 
-function normalized_returns(env, tree_depth, num_trajectories)
+function normalized_returns(env, tree_depth, max_branching_factor, num_trajectories)
     ret = zeros(num_trajectories)
     for idx = 1:num_trajectories
         EdgeFlip.reset!(env)
-        ret[idx] = single_trajectory_normalized_return(env, tree_depth)
+        ret[idx] = single_trajectory_normalized_return(env, tree_depth, max_branching_factor)
     end
     return ret
 end
 
-function average_normalized_returns(env, tree_depth, num_trajectories)
-    ret = normalized_returns(env, tree_depth, num_trajectories)
+function average_normalized_returns(env, tree_depth, max_branching_factor, num_trajectories)
+    ret = normalized_returns(env, tree_depth, max_branching_factor, num_trajectories)
     return sum(ret) / length(ret)
 end
 

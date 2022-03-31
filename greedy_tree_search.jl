@@ -9,10 +9,22 @@ include("plot.jl")
 
 TS = TreeSearch
 
-function returns_vs_nflips(nref, nflips, tree_depth, num_trajectories; maxstepfactor = 1.2)
+function returns_vs_nflips(
+    nref,
+    nflips,
+    tree_depth,
+    max_branching_factor,
+    num_trajectories;
+    maxstepfactor = 1.2,
+)
     maxflips = ceil(Int, maxstepfactor * nflips)
     env = EdgeFlip.GameEnv(nref, nflips, maxflips = maxflips)
-    avg = TS.average_normalized_returns(env, tree_depth, num_trajectories)
+    avg = TS.average_normalized_returns(
+        env,
+        tree_depth,
+        max_branching_factor,
+        num_trajectories,
+    )
     @printf "NFLIPS = %d \t MAXFLIPS = %d \t RET = %1.3f\n" nflips maxflips avg
     return avg
 end
@@ -26,14 +38,14 @@ function returns_vs_nflips(nref, nflips, num_trajectories; maxstepfactor = 1.2)
 end
 
 tree_depth = 3
+max_branching_factor = 5
 nref = 1
+num_actions = 42
 num_trajectories = 500
 nflip_range = 1:5:42
 
-num_actions = EdgeFlip.number_of_edges(EdgeFlip.generate_mesh(nref))
-
 gret = [returns_vs_nflips(nref, nf, num_trajectories) for nf in nflip_range]
-tret = [returns_vs_nflips(nref, nf, tree_depth, num_trajectories) for nf in nflip_range]
+tret = [returns_vs_nflips(nref, nf, tree_depth, max_branching_factor, num_trajectories) for nf in nflip_range]
 
 normalized_nflips = nflip_range ./ num_actions
 plot_returns(
