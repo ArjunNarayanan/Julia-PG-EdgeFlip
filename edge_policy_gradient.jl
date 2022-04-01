@@ -166,13 +166,12 @@ end
 function run_training_loop(
     env,
     policy,
+    optimizer,
     batch_size,
     discount,
-    num_epochs,
-    learning_rate;
+    num_epochs;
     print_every = 100,
 )
-    optimizer = ADAM(learning_rate)
     return_history = []
     epoch_history = []
 
