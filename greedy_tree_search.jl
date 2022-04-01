@@ -38,16 +38,16 @@ function returns_vs_nflips(nref, nflips, num_trajectories; maxstepfactor = 1.2)
 end
 
 tree_depth = 3
-max_branching_factor = 5
-nref = 1
-num_actions = 42
+max_branching_factor = 3
+nref = 2
+num_actions = 156
 num_trajectories = 500
-nflip_range = 1:5:42
+nflip_range = 10:20:150
 
-gret = [returns_vs_nflips(nref, nf, num_trajectories) for nf in nflip_range]
+# gret = [returns_vs_nflips(nref, nf, num_trajectories) for nf in nflip_range]
 tret = [returns_vs_nflips(nref, nf, tree_depth, max_branching_factor, num_trajectories) for nf in nflip_range]
 
-normalized_nflips = nflip_range ./ num_actions
+# normalized_nflips = nflip_range ./ num_actions
 plot_returns(
     normalized_nflips,
     tret,
