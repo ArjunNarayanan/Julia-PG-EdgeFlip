@@ -2,27 +2,12 @@ using Printf
 using Flux
 using EdgeFlip
 # include("supervised_greedy_training.jl")
+include("tri.jl")
 include("edge_policy_gradient.jl")
 include("greedy_policy.jl")
 include("plot.jl")
 
 PG = EdgePolicyGradient
-
-function returns_versus_nflips(policy, nref, nflips, num_trajectories; maxstepfactor = 1.2)
-    maxflips = ceil(Int, maxstepfactor * nflips)
-    env = EdgeFlip.OrderedGameEnv(nref, nflips, maxflips = maxflips)
-    avg = PG.average_normalized_returns(env, policy, num_trajectories)
-    @printf "NFLIPS = %d \t MAXFLIPS = %d \t RET = %1.3f\n" env.num_initial_flips env.maxflips avg
-    return avg
-end
-
-function returns_versus_nflips(nref, nflips, num_trajectories; maxstepfactor = 1.2)
-    maxflips = ceil(Int, maxstepfactor * nflips)
-    env = EdgeFlip.GameEnv(nref, nflips, maxflips = maxflips)
-    avg = GreedyPolicy.average_normalized_returns(env, num_trajectories)
-    @printf "NFLIPS = %d \t MAXFLIPS = %d \t RET = %1.3f\n" env.num_initial_flips env.maxflips avg
-    return avg
-end
 
 function PG.state(env::EdgeFlip.OrderedGameEnv)
     ets = copy(EdgeFlip.edge_template_score(env))
@@ -48,9 +33,8 @@ function PG.reward(env::EdgeFlip.OrderedGameEnv)
     return EdgeFlip.reward(env)
 end
 
-function PG.reset!(env::EdgeFlip.OrderedGameEnv; nflips = rand(1:42))
-    maxflips = ceil(Int, 1.2nflips)
-    EdgeFlip.reset!(env, nflips = nflips, maxflips = maxflips)
+function PG.reset!(env::EdgeFlip.OrderedGameEnv)
+    EdgeFlip.reset!(env)
 end
 
 function PG.score(env::EdgeFlip.OrderedGameEnv)
@@ -60,7 +44,7 @@ end
 struct EdgeModel
     model::Any
     bvals::Any
-    batchnorm
+    batchnorm::Any
     function EdgeModel(in_channels, out_channels)
         model = Dense(3in_channels, out_channels)
         bvals = Flux.glorot_uniform(in_channels)
@@ -89,7 +73,7 @@ end
 function eval_batch(em::EdgeModel, ep, econn, epairs)
     nf, na, nb = size(ep)
 
-    ep = cat(ep, repeat(em.bvals, inner = (1,1,nb)), dims = 2)
+    ep = cat(ep, repeat(em.bvals, inner = (1, 1, nb)), dims = 2)
     ep = reshape(ep[:, econn, :], 3nf, na, nb)
     ep = em.model(ep)
 
@@ -152,10 +136,24 @@ function PG.eval_batch(p::Policy3L, ep, econn, epairs)
     return logits
 end
 
-nref = 1
+function make_env(element_size; maxflipfactor = 2)
+    p, t = circlemesh(element_size)
+    mesh = EdgeFlip.Mesh(p, t)
+    num_nodes = size(p, 1)
+    num_edges = EdgeFlip.number_of_edges(mesh)
+    d0 = fill(6, num_nodes)
+    d0[mesh.bnd_nodes] .= 4
+    maxflips = ceil(Int, maxflipfactor * num_edges)
 
-env = EdgeFlip.OrderedGameEnv(nref, 0)
-num_actions = EdgeFlip.number_of_actions(env)
+    env = EdgeFlip.OrderedGameEnv(mesh, 0, d0 = d0, maxflips = maxflips)
+
+    return env
+end
+
+element_size = 0.4
+maxflipfactor = 2
+
+env = make_env(element_size)
 policy = Policy3L()
 
 # PG.reset!(env)
@@ -169,13 +167,15 @@ policy = Policy3L()
 # gd_ret = [returns_versus_nflips(nref, nf, num_trajectories) for nf in nflip_range]
 # normalized_nflips = nflip_range ./ num_actions
 
-# num_epochs = 5000
-# num_trajectories = 500
-# batch_size = 100
-# discount = 1.0
-# learning_rate = 2e-3
+num_epochs = 1000
+batch_size = 200
+discount = 1.0
+learning_rate = 1e-2
 
-# PG.run_training_loop(env, policy, batch_size, discount, num_epochs, learning_rate)
+optimizer = ADAM(learning_rate)
+epochs, ret = PG.run_training_loop(env, policy, optimizer, batch_size, discount, num_epochs)
+
+# num_trajectories = 500
 # nn_ret = [returns_versus_nflips(policy, nref, nf, num_trajectories) for nf in nflip_range]
 # plot_returns(normalized_nflips, nn_ret, gd_ret = gd_ret, ylim = [0.75, 1])
 
