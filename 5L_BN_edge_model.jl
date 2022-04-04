@@ -192,22 +192,21 @@ policy = Policy5L(8)
 # l = PG.eval_batch(policy, bs[1], bs[2], bs[3])
 
 # num_trajectories = 500
-nflip_range = 1:5:42
+# nflip_range = 1:5:42
 # gd_ret = [returns_versus_nflips(nref, nf, num_trajectories) for nf in nflip_range]
 # normalized_nflips = nflip_range ./ num_actions
 
 
-num_epochs = 5000
-batch_size = 100
-discount = 1.0
+# num_epochs = 5000
+# batch_size = 100
+# discount = 1.0
 
 # optimizer = Flux.Optimiser(ExpDecay(0.1, 0.7, 500, 1e-4), ADAM(0.01))
-optimizer = Flux.Optimiser(ExpDecay(0.1, 0.7, 500, 1e-6), ADAM(1e-4))
-PG.run_training_loop(env, policy, optimizer, batch_size, discount, num_epochs)
+# PG.run_training_loop(env, policy, optimizer, batch_size, discount, num_epochs)
 
-num_trajectories = 500
-nn_ret = [returns_versus_nflips(policy, nref, nf, num_trajectories) for nf in nflip_range]
-plot_returns(normalized_nflips, nn_ret, gd_ret = gd_ret, ylim = [0.75, 1])
+# num_trajectories = 500
+# nn_ret = [returns_versus_nflips(policy, nref, nf, num_trajectories) for nf in nflip_range]
+# plot_returns(normalized_nflips, nn_ret, gd_ret = gd_ret, ylim = [0.75, 1])
 
 # filename = "results/new-edge-model/5L-res-performance.png"
 # plot_returns(normalized_nflips, nn_ret, gd_ret = gd_ret, ylim = [0.75, 1], filename = filename)
