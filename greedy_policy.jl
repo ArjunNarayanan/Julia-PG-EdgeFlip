@@ -11,19 +11,24 @@ function step!(env::EdgeFlip.GameEnv, action)
     end
 end
 
-function is_terminated(env::EdgeFlip.GameEnv)
+function step!(env::EdgeFlip.OrderedGameEnv, action)
+    triangle, vertex = EdgeFlip.edgeix_from_edgeid(action, env.mesh)
+    EdgeFlip.step!(env, triangle, vertex)
+end
+
+function is_terminated(env)
     return EdgeFlip.is_terminated(env)
 end
 
-function reward(env::EdgeFlip.GameEnv)
+function reward(env)
     return EdgeFlip.reward(env)
 end
 
-function reset!(env::EdgeFlip.GameEnv)
+function reset!(env)
     EdgeFlip.reset!(env)
 end
 
-function score(env::EdgeFlip.GameEnv)
+function score(env)
     return EdgeFlip.score(env)
 end
 
@@ -37,18 +42,18 @@ end
 
 function greedy_actions(env)
     num_actions = EdgeFlip.number_of_actions(env)
-    rewards = [EdgeFlip.reward(env,e) for e in 1:num_actions]
+    rewards = [EdgeFlip.reward(env, e) for e = 1:num_actions]
     maxr = maximum(rewards)
     actions = findall(rewards .== maxr)
-    
+
     return actions
 end
 
-function action_probabilities(greedy_actions,num_actions)
+function action_probabilities(greedy_actions, num_actions)
     num_greedy_actions = length(greedy_actions)
     @assert num_greedy_actions > 0
     probs = zeros(num_actions)
-    probs[greedy_actions] .= 1.0/length(greedy_actions)
+    probs[greedy_actions] .= 1.0 / length(greedy_actions)
     return probs
 end
 
@@ -69,7 +74,7 @@ function single_trajectory_return(env)
         while !done
             action = greedy_action(env)
             step!(env, action)
-            minscore = min(minscore,score(env))
+            minscore = min(minscore, score(env))
             done = is_terminated(env)
         end
         ret = initial_score - minscore
@@ -83,23 +88,23 @@ function single_trajectory_normalized_return(env)
         return 1.0
     else
         ret = single_trajectory_return(env)
-        return ret/maxreturn
+        return ret / maxreturn
     end
 end
 
 function normalized_returns(env, num_trajectories)
     ret = zeros(num_trajectories)
-    for idx in 1:num_trajectories
+    for idx = 1:num_trajectories
         reset!(env)
         ret[idx] = single_trajectory_normalized_return(env)
     end
-    return ret    
+    return ret
 end
 
 
 function average_returns(env, num_trajectories)
     ret = zeros(num_trajectories)
-    for idx in 1:num_trajectories
+    for idx = 1:num_trajectories
         reset!(env)
         ret[idx] = single_trajectory_return(env)
     end

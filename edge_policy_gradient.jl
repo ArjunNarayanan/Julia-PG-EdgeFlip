@@ -54,27 +54,32 @@ function collect_batch_trajectories(env, policy, batch_size, discount)
     batch_weights = []
     batch_returns = []
 
+    counter = 0
     reset!(env)
-
+    
     while true
         ets, econn, epairs = state(env)
         logits = vec(eval_single(policy, ets, econn, epairs))
         probs = Categorical(softmax(logits))
         action_index = rand(probs)
-
+        
         action = idx_to_action(action_index)
-
+        
         step!(env, action)
         r = reward(env)
         done = is_terminated(env)
-
+        
         push!(batch_ets, ets)
         # push!(batch_econn, econn)
+        num_actions = size(ets, 2)
+        epairs .+= counter*num_actions
         push!(batch_edge_pairs, epairs)
         append!(batch_actions, action_index)
         append!(ep_rewards, r)
 
-        if done || length(batch_actions) >= batch_size
+        counter += 1
+
+        if done || counter >= batch_size
             ep_ret = advantage(ep_rewards, discount)
             append!(batch_weights, ep_ret)
             append!(batch_returns, sum(ep_rewards))
@@ -89,7 +94,8 @@ function collect_batch_trajectories(env, policy, batch_size, discount)
     end
 
     batch_ets = cat(batch_ets..., dims = 3)
-    batch_edge_pairs = cat(batch_edge_pairs..., dims = 2)
+    # batch_edge_pairs = cat(batch_edge_pairs..., dims = 2)
+    batch_edge_pairs = vcat(batch_edge_pairs...)
     econn = env.edge_connectivity
 
     states = (batch_ets, econn, batch_edge_pairs)

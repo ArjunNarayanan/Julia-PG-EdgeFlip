@@ -3,8 +3,9 @@ using Flux
 using EdgeFlip
 # include("supervised_greedy_training.jl")
 include("edge_policy_gradient.jl")
+include("edge_model.jl")
 include("greedy_policy.jl")
-include("plot.jl")
+# include("plot.jl")
 
 PG = EdgePolicyGradient
 
@@ -55,53 +56,6 @@ end
 
 function PG.score(env::EdgeFlip.OrderedGameEnv)
     return EdgeFlip.score(env)
-end
-
-struct EdgeModel
-    model::Any
-    bvals::Any
-    batchnorm
-    function EdgeModel(in_channels, out_channels)
-        model = Dense(3in_channels, out_channels)
-        bvals = Flux.glorot_uniform(in_channels)
-        batchnorm = BatchNorm(out_channels)
-        new(model, bvals, batchnorm)
-    end
-end
-
-Flux.@functor EdgeModel
-
-function eval_single(em::EdgeModel, ep, econn, epairs)
-    nf, na = size(ep)
-
-    ep = cat(ep, em.bvals, dims = 2)
-    ep = reshape(ep[:, econn], 3nf, na)
-    ep = em.model(ep)
-
-    ep2 = ep[:, epairs]
-    ep = 0.5 * (ep + ep2)
-
-    ep = em.batchnorm(ep)
-
-    return ep
-end
-
-function eval_batch(em::EdgeModel, ep, econn, epairs)
-    nf, na, nb = size(ep)
-
-    ep = cat(ep, repeat(em.bvals, inner = (1,1,nb)), dims = 2)
-    ep = reshape(ep[:, econn, :], 3nf, na, nb)
-    ep = em.model(ep)
-
-    ep2 = cat([ep[:, epairs[:, b], b] for b = 1:nb]..., dims = 3)
-    ep = 0.5 * (ep + ep2)
-
-    nf, na, nb = size(ep)
-    ep = reshape(ep, nf, :)
-    ep = em.batchnorm(ep)
-    ep = reshape(ep, nf, na, nb)
-
-    return ep
 end
 
 struct Policy3L
@@ -169,13 +123,16 @@ policy = Policy3L()
 # gd_ret = [returns_versus_nflips(nref, nf, num_trajectories) for nf in nflip_range]
 # normalized_nflips = nflip_range ./ num_actions
 
-# num_epochs = 5000
+# num_epochs = 1000
 # num_trajectories = 500
 # batch_size = 100
 # discount = 1.0
-# learning_rate = 2e-3
+# learning_rate = 1e-2
 
-# PG.run_training_loop(env, policy, batch_size, discount, num_epochs, learning_rate)
+# optimizer = ADAM(learning_rate)
+# bs, ba, bw, ret = PG.collect_batch_trajectories(env, policy, batch_size, 1.0)
+# PG.step_epoch(env, policy, optimizer, batch_size, discount)
+# PG.run_training_loop(env, policy, optimizer, batch_size, discount, num_epochs)
 # nn_ret = [returns_versus_nflips(policy, nref, nf, num_trajectories) for nf in nflip_range]
 # plot_returns(normalized_nflips, nn_ret, gd_ret = gd_ret, ylim = [0.75, 1])
 

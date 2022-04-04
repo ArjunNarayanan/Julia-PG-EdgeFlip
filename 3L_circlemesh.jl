@@ -4,10 +4,12 @@ using EdgeFlip
 # include("supervised_greedy_training.jl")
 include("tri.jl")
 include("edge_policy_gradient.jl")
+include("edge_model.jl")
 include("greedy_policy.jl")
-include("plot.jl")
+# include("plot.jl")
 
 PG = EdgePolicyGradient
+GP = GreedyPolicy
 
 function PG.state(env::EdgeFlip.OrderedGameEnv)
     ets = copy(EdgeFlip.edge_template_score(env))
@@ -39,53 +41,6 @@ end
 
 function PG.score(env::EdgeFlip.OrderedGameEnv)
     return EdgeFlip.score(env)
-end
-
-struct EdgeModel
-    model::Any
-    bvals::Any
-    batchnorm::Any
-    function EdgeModel(in_channels, out_channels)
-        model = Dense(3in_channels, out_channels)
-        bvals = Flux.glorot_uniform(in_channels)
-        batchnorm = BatchNorm(out_channels)
-        new(model, bvals, batchnorm)
-    end
-end
-
-Flux.@functor EdgeModel
-
-function eval_single(em::EdgeModel, ep, econn, epairs)
-    nf, na = size(ep)
-
-    ep = cat(ep, em.bvals, dims = 2)
-    ep = reshape(ep[:, econn], 3nf, na)
-    ep = em.model(ep)
-
-    ep2 = ep[:, epairs]
-    ep = 0.5 * (ep + ep2)
-
-    ep = em.batchnorm(ep)
-
-    return ep
-end
-
-function eval_batch(em::EdgeModel, ep, econn, epairs)
-    nf, na, nb = size(ep)
-
-    ep = cat(ep, repeat(em.bvals, inner = (1, 1, nb)), dims = 2)
-    ep = reshape(ep[:, econn, :], 3nf, na, nb)
-    ep = em.model(ep)
-
-    ep2 = cat([ep[:, epairs[:, b], b] for b = 1:nb]..., dims = 3)
-    ep = 0.5 * (ep + ep2)
-
-    nf, na, nb = size(ep)
-    ep = reshape(ep, nf, :)
-    ep = em.batchnorm(ep)
-    ep = reshape(ep, nf, na, nb)
-
-    return ep
 end
 
 struct Policy3L
@@ -150,10 +105,10 @@ function make_env(element_size; maxflipfactor = 2)
     return env
 end
 
-element_size = 0.4
-maxflipfactor = 2
+element_size = 0.3
+maxflipfactor = 1
 
-env = make_env(element_size)
+env = make_env(element_size, maxflipfactor = maxflipfactor)
 policy = Policy3L()
 
 # PG.reset!(env)
@@ -162,18 +117,21 @@ policy = Policy3L()
 # bs, ba, bw, ret = PG.collect_batch_trajectories(env, policy, 10, 1.0)
 # l = PG.eval_batch(policy, bs[1], bs[2], bs[3])
 
-# num_trajectories = 500
-# nflip_range = 1:5:42
-# gd_ret = [returns_versus_nflips(nref, nf, num_trajectories) for nf in nflip_range]
-# normalized_nflips = nflip_range ./ num_actions
-
 num_epochs = 1000
-batch_size = 200
+batch_size = 100
 discount = 1.0
 learning_rate = 1e-2
 
 optimizer = ADAM(learning_rate)
 epochs, ret = PG.run_training_loop(env, policy, optimizer, batch_size, discount, num_epochs)
+
+opt_ret = env.score - env.optimum_score
+
+PG.reset!(env)
+nn_ret = PG.single_trajectory_return(env, policy)
+
+PG.reset!(env)
+gd_ret = GP.single_trajectory_return(env)
 
 # num_trajectories = 500
 # nn_ret = [returns_versus_nflips(policy, nref, nf, num_trajectories) for nf in nflip_range]
