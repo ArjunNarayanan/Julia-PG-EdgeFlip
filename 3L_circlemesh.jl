@@ -11,6 +11,20 @@ include("greedy_policy.jl")
 PG = EdgePolicyGradient
 GP = GreedyPolicy
 
+function returns_versus_maxflips(policy, element_size, maxflips, num_trajectories)
+    env = make_env(element_size, maxflips)
+    ret = PG.average_normalized_returns(env, policy, num_trajectories)
+    @printf "MAXFLIPS = %d \t RET = %1.4f\n" maxflips ret
+    return ret
+end
+
+function returns_versus_maxflips(element_size, maxflips, num_trajectories)
+    env = make_env(element_size, maxflips)
+    ret = GP.average_normalized_returns(env, num_trajectories)
+    @printf "MAXFLIPS = %d \t RET = %1.4f\n" maxflips ret
+    return ret
+end
+
 function PG.state(env::EdgeFlip.OrderedGameEnv)
     ets = copy(EdgeFlip.edge_template_score(env))
     econn = copy(EdgeFlip.edge_connectivity(env))
@@ -35,9 +49,13 @@ function PG.reward(env::EdgeFlip.OrderedGameEnv)
     return EdgeFlip.reward(env)
 end
 
-function PG.reset!(env::EdgeFlip.OrderedGameEnv)
-    EdgeFlip.reset!(env)
+function PG.reset!(env::EdgeFlip.OrderedGameEnv; nflips = env.num_initial_flips)
+    EdgeFlip.reset!(env, nflips = env.num_initial_flips)
 end
+
+# function PG.reset!(env::EdgeFlip.OrderedGameEnv)
+#     EdgeFlip.reset!(env)
+# end
 
 function PG.score(env::EdgeFlip.OrderedGameEnv)
     return EdgeFlip.score(env)
@@ -91,14 +109,13 @@ function PG.eval_batch(p::Policy3L, ep, econn, epairs)
     return logits
 end
 
-function make_env(element_size; maxflipfactor = 2)
+function make_env(element_size, maxflips)
     p, t = circlemesh(element_size)
     mesh = EdgeFlip.Mesh(p, t)
     num_nodes = size(p, 1)
     num_edges = EdgeFlip.number_of_edges(mesh)
     d0 = fill(6, num_nodes)
     d0[mesh.bnd_nodes] .= 4
-    maxflips = ceil(Int, maxflipfactor * num_edges)
 
     env = EdgeFlip.OrderedGameEnv(mesh, 0, d0 = d0, maxflips = maxflips)
 
@@ -106,10 +123,10 @@ function make_env(element_size; maxflipfactor = 2)
 end
 
 element_size = 0.3
-maxflipfactor = 1
+maxflips = 25
 
-env = make_env(element_size, maxflipfactor = maxflipfactor)
-policy = Policy3L()
+env = make_env(element_size, maxflips)
+# policy = Policy3L()
 
 # PG.reset!(env)
 # ep, econn, epairs = PG.state(env)
@@ -117,25 +134,38 @@ policy = Policy3L()
 # bs, ba, bw, ret = PG.collect_batch_trajectories(env, policy, 10, 1.0)
 # l = PG.eval_batch(policy, bs[1], bs[2], bs[3])
 
-num_epochs = 1000
-batch_size = 100
-discount = 1.0
-learning_rate = 1e-2
+# num_epochs = 1000
+# batch_size = 50
+# discount = 0.8
 
+using BSON: @load
+@load "results/models/new-edge-model/3L.bson" policy
+
+
+learning_rate = 5e-4
 optimizer = ADAM(learning_rate)
 epochs, ret = PG.run_training_loop(env, policy, optimizer, batch_size, discount, num_epochs)
 
+num_trajectories = 100
+maxflip_range = 5:5:70
 opt_ret = env.score - env.optimum_score
+PG.reset!(env)
+PG.single_trajectory_return(env, policy)
+# PG.single_trajectory_normalized_return(env, policy)
+nn_ret = [returns_versus_maxflips(policy, element_size, mf, num_trajectories) for mf in maxflip_range]
+
 
 PG.reset!(env)
-nn_ret = PG.single_trajectory_return(env, policy)
+gd_ret = [returns_versus_maxflips(element_size, mf, num_trajectories) for mf in maxflip_range]
 
-PG.reset!(env)
-gd_ret = GP.single_trajectory_return(env)
+
+# gd_ret = GP.single_trajectory_return(env)
+# gd_ret = GP.average_normalized_returns(env, num_trajectories)
 
 # num_trajectories = 500
 # nn_ret = [returns_versus_nflips(policy, nref, nf, num_trajectories) for nf in nflip_range]
-# plot_returns(normalized_nflips, nn_ret, gd_ret = gd_ret, ylim = [0.75, 1])
+include("plot.jl")
+plot_returns(maxflip_range, nn_ret, gd_ret = gd_ret, ylim = [0., 1])
 
 # filename = "results/new-edge-model/3L-res-performance.png"
 # plot_returns(normalized_nflips, nn_ret, gd_ret = gd_ret, ylim = [0.75, 1], filename = filename)

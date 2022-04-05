@@ -1,11 +1,10 @@
 using Printf
 using Flux
 using EdgeFlip
-# include("supervised_greedy_training.jl")
 include("edge_policy_gradient.jl")
-include("edge_model.jl")
+include("3L_policy.jl")
 include("greedy_policy.jl")
-# include("plot.jl")
+include("plot.jl")
 
 PG = EdgePolicyGradient
 
@@ -58,52 +57,11 @@ function PG.score(env::EdgeFlip.OrderedGameEnv)
     return EdgeFlip.score(env)
 end
 
-struct Policy3L
-    emodel1::Any
-    emodel2::Any
-    emodel3::Any
-    lmodel::Any
-    function Policy3L()
-        emodel1 = EdgeModel(4, 16)
-        emodel2 = EdgeModel(16, 16)
-        emodel3 = EdgeModel(16, 16)
-        lmodel = Dense(16, 1)
-        new(emodel1, emodel2, emodel3, lmodel)
-    end
-end
-
-Flux.@functor Policy3L
-
-function PG.eval_single(p::Policy3L, ep, econn, epairs)
-    x = eval_single(p.emodel1, ep, econn, epairs)
-    x = relu.(x)
-
-    y = eval_single(p.emodel2, x, econn, epairs)
-    y = x + y
-    x = relu.(y)
-
-    y = eval_single(p.emodel3, x, econn, epairs)
-    y = x + y
-    x = relu.(y)
-
-    logits = p.lmodel(x)
-    return logits
-end
-
-function PG.eval_batch(p::Policy3L, ep, econn, epairs)
-    x = eval_batch(p.emodel1, ep, econn, epairs)
-    x = relu.(x)
-
-    y = eval_batch(p.emodel2, x, econn, epairs)
-    y = x + y
-    x = relu.(y)
-
-    y = eval_batch(p.emodel3, x, econn, epairs)
-    y = x + y
-    x = relu.(y)
-
-    logits = p.lmodel(x)
-    return logits
+function evaluate_model(policy; num_trajectories = 500)
+    nref = 1
+    nflip_range = 1:5:42
+    ret = [returns_versus_nflips(policy, nref, nf, num_trajectories) for nf in nflip_range]
+    return ret
 end
 
 nref = 1
@@ -123,18 +81,38 @@ policy = Policy3L()
 # gd_ret = [returns_versus_nflips(nref, nf, num_trajectories) for nf in nflip_range]
 # normalized_nflips = nflip_range ./ num_actions
 
-# num_epochs = 1000
 # num_trajectories = 500
-# batch_size = 100
-# discount = 1.0
-# learning_rate = 1e-2
+batch_size = 100
+num_epochs = 10000
+learning_rate = 1e-2
+decay = 0.7
+decay_step = 500
+clip = 5e-5
+discount = 0.8
 
-# optimizer = ADAM(learning_rate)
-# bs, ba, bw, ret = PG.collect_batch_trajectories(env, policy, batch_size, 1.0)
-# PG.step_epoch(env, policy, optimizer, batch_size, discount)
+optimizer =
+    Flux.Optimiser(ExpDecay(learning_rate, decay, decay_step, clip), ADAM(learning_rate))
+PG.train_and_save_best_models(
+    env,
+    policy,
+    optimizer,
+    batch_size,
+    discount,
+    num_epochs,
+    evaluate_model,
+    foldername = "results/models/3L-model/"
+)
+
+using BSON: @load
+
+@load "results/models/new-edge-model/3L.bson" policy
+
 # PG.run_training_loop(env, policy, optimizer, batch_size, discount, num_epochs)
-# nn_ret = [returns_versus_nflips(policy, nref, nf, num_trajectories) for nf in nflip_range]
-# plot_returns(normalized_nflips, nn_ret, gd_ret = gd_ret, ylim = [0.75, 1])
+nn_ret = [returns_versus_nflips(policy, nref, nf, num_trajectories) for nf in nflip_range]
+plot_returns(normalized_nflips, nn_ret, gd_ret = gd_ret, ylim = [0.75, 1])
 
 # filename = "results/new-edge-model/3L-res-performance.png"
 # plot_returns(normalized_nflips, nn_ret, gd_ret = gd_ret, ylim = [0.75, 1], filename = filename)
+
+# using BSON: @save
+# @save "results/models/new-edge-model/3L.bson" policy

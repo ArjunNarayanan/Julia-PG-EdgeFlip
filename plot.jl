@@ -1,5 +1,5 @@
 using PyPlot
-pygui(true)
+# pygui(true)
 using MeshPlotter
 using Distributions: Categorical
 

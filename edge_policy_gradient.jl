@@ -1,10 +1,11 @@
 module EdgePolicyGradient
 
 using Flux
+using PyPlot
 using Distributions: Categorical
 using Printf
 using Statistics
-
+using BSON: @save
 
 state(env) = nothing
 step!(env, action) = nothing
@@ -15,14 +16,7 @@ score(env) = nothing
 eval_single(policy, state) = nothing
 eval_batch(policy, state) = nothing
 
-function policy_gradient_loss(
-    ets,
-    econn,
-    epairs,
-    policy,
-    actions,
-    weights,
-)
+function policy_gradient_loss(ets, econn, epairs, policy, actions, weights)
     logits = eval_batch(policy, ets, econn, epairs)
     logp = logsoftmax(logits, dims = 2)
     selected_logp = -[logp[1, action, idx] for (idx, action) in enumerate(actions)]
@@ -41,7 +35,7 @@ function advantage(rewards, discount)
 end
 
 function idx_to_action(idx)
-    triangle, vertex = div(idx-1,3) + 1, (idx - 1)%3 + 1
+    triangle, vertex = div(idx - 1, 3) + 1, (idx - 1) % 3 + 1
     return triangle, vertex
 end
 
@@ -56,23 +50,23 @@ function collect_batch_trajectories(env, policy, batch_size, discount)
 
     counter = 0
     reset!(env)
-    
+
     while true
         ets, econn, epairs = state(env)
         logits = vec(eval_single(policy, ets, econn, epairs))
         probs = Categorical(softmax(logits))
         action_index = rand(probs)
-        
+
         action = idx_to_action(action_index)
-        
+
         step!(env, action)
         r = reward(env)
         done = is_terminated(env)
-        
+
         push!(batch_ets, ets)
         # push!(batch_econn, econn)
         num_actions = size(ets, 2)
-        epairs .+= counter*num_actions
+        epairs .+= counter * num_actions
         push!(batch_edge_pairs, epairs)
         append!(batch_actions, action_index)
         append!(ep_rewards, r)
@@ -189,11 +183,62 @@ function run_training_loop(
 
         if epoch % print_every == 0
             statement =
-            @sprintf "epoch: %3d \t loss: %.4f \t avg return: %3.2f" epoch loss avg_return
+                @sprintf "epoch: %3d \t loss: %.4f \t avg return: %3.2f" epoch loss avg_return
             println(statement)
         end
     end
     return epoch_history, return_history
 end
+
+function train_and_save_best_models(
+    env,
+    policy,
+    optimizer,
+    batch_size,
+    discount,
+    num_epochs,
+    evaluator;
+    evaluate_every = 500,
+    foldername = "results/models/new-edge-model/",
+)
+
+    ret = evaluator(policy)
+    counter = 1
+
+    for epoch = 1:num_epochs
+        loss, avg_return = step_epoch(env, policy, optimizer, batch_size, discount)
+
+        if epoch % evaluate_every == 0
+            new_rets = evaluator(policy)
+            if all(new_rets .> ret)
+                plot_filename = foldername * "policy-" * string(counter) * ".png"
+                plot_returns(new_rets, filename = plot_filename)
+
+                model_filename = foldername * "policy-" * string(counter) * ".bson"
+                @save model_filename policy
+
+                counter += 1
+                ret .= new_rets
+
+                average_return = sum(new_rets) / length(new_rets)
+
+                statement =
+                    @sprintf "epoch: %3d \t avg return: %3.2f" epoch avg_return
+                println(statement)
+            end
+        end
+    end
+end
+
+function plot_returns(ret; filename = "", ylim = (0.75, 1.0))
+    fig, ax = subplots()
+    ax.plot(ret)
+    ax.set_ylim(ylim)
+    if length(filename) > 0
+        fig.savefig(filename)
+    end
+    return fig
+end
+
 
 end
