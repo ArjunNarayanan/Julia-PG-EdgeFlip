@@ -82,34 +82,34 @@ policy = Policy3L()
 # normalized_nflips = nflip_range ./ num_actions
 
 # num_trajectories = 500
-batch_size = 100
-num_epochs = 10000
-learning_rate = 1e-2
-decay = 0.7
-decay_step = 500
-clip = 5e-5
-discount = 0.8
+# batch_size = 100
+# num_epochs = 10000
+# learning_rate = 1e-2
+# decay = 0.7
+# decay_step = 500
+# clip = 5e-5
+# discount = 0.8
 
-optimizer =
-    Flux.Optimiser(ExpDecay(learning_rate, decay, decay_step, clip), ADAM(learning_rate))
-PG.train_and_save_best_models(
-    env,
-    policy,
-    optimizer,
-    batch_size,
-    discount,
-    num_epochs,
-    evaluate_model,
-    foldername = "results/models/3L-model/"
-)
+# optimizer =
+#     Flux.Optimiser(ExpDecay(learning_rate, decay, decay_step, clip), ADAM(learning_rate))
+# PG.train_and_save_best_models(
+#     env,
+#     policy,
+#     optimizer,
+#     batch_size,
+#     discount,
+#     num_epochs,
+#     evaluate_model,
+#     foldername = "results/models/3L-model/"
+# )
 
-using BSON: @load
+# using BSON: @load
 
-@load "results/models/new-edge-model/3L.bson" policy
+# @load "results/models/new-edge-model/3L.bson" policy
 
 # PG.run_training_loop(env, policy, optimizer, batch_size, discount, num_epochs)
-nn_ret = [returns_versus_nflips(policy, nref, nf, num_trajectories) for nf in nflip_range]
-plot_returns(normalized_nflips, nn_ret, gd_ret = gd_ret, ylim = [0.75, 1])
+# nn_ret = [returns_versus_nflips(policy, nref, nf, num_trajectories) for nf in nflip_range]
+# plot_returns(normalized_nflips, nn_ret, gd_ret = gd_ret, ylim = [0.75, 1])
 
 # filename = "results/new-edge-model/3L-res-performance.png"
 # plot_returns(normalized_nflips, nn_ret, gd_ret = gd_ret, ylim = [0.75, 1], filename = filename)
