@@ -48,8 +48,11 @@ function PG.reward(env::EdgeFlip.OrderedGameEnv)
     return EdgeFlip.reward(env)
 end
 
-# function PG.reset!(env::EdgeFlip.OrderedGameEnv; nflips = rand(1:42), maxflipfactor = 1.0)
-#     maxflips = ceil(Int, maxflipfactor*nflips)
+# function PG.reset!(
+#     env::EdgeFlip.OrderedGameEnv;
+#     nflips = rand(1:EdgeFlip.number_of_actions(env)),
+# )
+#     maxflips = ceil(Int, 1.2nflips)
 #     EdgeFlip.reset!(env, nflips = nflips, maxflips = maxflips)
 # end
 
@@ -57,6 +60,7 @@ function PG.reset!(env::EdgeFlip.OrderedGameEnv; nflips = 11, maxflipfactor = 1.
     maxflips = ceil(Int, maxflipfactor*nflips)
     EdgeFlip.reset!(env, nflips = nflips, maxflips = maxflips)
 end
+
 
 function PG.score(env::EdgeFlip.OrderedGameEnv)
     return EdgeFlip.score(env)
@@ -74,7 +78,7 @@ nref = 1
 
 env = EdgeFlip.OrderedGameEnv(nref, 0)
 num_actions = EdgeFlip.number_of_actions(env)
-policy = PolicyNL(3, 16)
+policy = PolicyNL(10,16)
 
 # PG.reset!(env)
 # ep, econn, epairs = PG.state(env)
@@ -87,7 +91,7 @@ policy = PolicyNL(3, 16)
 # gd_ret = [returns_versus_nflips(nref, nf, num_trajectories) for nf in nflip_range]
 # normalized_nflips = nflip_range ./ num_actions
 
-# num_trajectories = 500
+
 batch_size = 100
 num_epochs = 10000
 learning_rate = 1e-2
@@ -98,8 +102,8 @@ discount = 0.8
 
 optimizer =
     Flux.Optimiser(ExpDecay(learning_rate, decay, decay_step, clip), ADAM(learning_rate))
+# # optimizer = ADAM(5e-6)
 
-optimizer = ADAM(5e-6)
 PG.train_and_save_best_models(
     env,
     policy,
@@ -108,19 +112,9 @@ PG.train_and_save_best_models(
     discount,
     num_epochs,
     evaluate_model,
-    foldername = "results/models/3L-model/"
+    foldername = "results/models/10L-model/"
 )
 
-# using BSON: @load
 
-# @load "results/models/new-edge-model/3L.bson" policy
-
-# PG.run_training_loop(env, policy, optimizer, batch_size, discount, num_epochs)
-# nn_ret = [returns_versus_nflips(policy, nref, nf, num_trajectories) for nf in nflip_range]
+nn_ret = [returns_versus_nflips(policy, nref, nf, num_trajectories, maxstepfactor = 1.2) for nf in nflip_range]
 # plot_returns(normalized_nflips, nn_ret, gd_ret = gd_ret, ylim = [0.75, 1])
-
-# filename = "results/new-edge-model/3L-res-performance.png"
-# plot_returns(normalized_nflips, nn_ret, gd_ret = gd_ret, ylim = [0.75, 1], filename = filename)
-
-# using BSON: @save
-# @save "results/models/new-edge-model/3L.bson" policy

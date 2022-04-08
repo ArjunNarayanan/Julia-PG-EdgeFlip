@@ -203,27 +203,29 @@ function train_and_save_best_models(
 )
 
     ret = evaluator(policy)
-    counter = 1
 
     for epoch = 1:num_epochs
         loss, avg_return = step_epoch(env, policy, optimizer, batch_size, discount)
 
         if epoch % evaluate_every == 0
             new_rets = evaluator(policy)
-            if all(new_rets .> ret)
-                plot_filename = foldername * "policy-" * string(counter) * ".png"
-                plot_returns(new_rets, filename = plot_filename)
 
-                model_filename = foldername * "policy-" * string(counter) * ".bson"
+            old_err = sum((1.0 .- ret).^2)
+            new_err = sum((1.0 .- new_rets).^2)
+
+            if new_err < old_err
+                plot_filename = foldername * "policy-" * string(epoch) * ".png"
+                # plot_returns(new_rets, filename = plot_filename)
+
+                model_filename = foldername * "policy-" * string(epoch) * ".bson"
                 @save model_filename policy
 
-                counter += 1
                 ret .= new_rets
 
                 average_return = sum(new_rets) / length(new_rets)
 
                 statement =
-                    @sprintf "epoch: %3d \t avg return: %3.2f" epoch avg_return
+                    @sprintf "epoch: %3d \t avg return: %3.2f" epoch average_return
                 println(statement)
             end
         end

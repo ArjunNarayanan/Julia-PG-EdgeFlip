@@ -15,7 +15,7 @@ function returns_vs_nflips(
     tree_depth,
     max_branching_factor,
     num_trajectories;
-    maxstepfactor = 1.2,
+    maxstepfactor = 1.0,
 )
     maxflips = ceil(Int, maxstepfactor * nflips)
     env = EdgeFlip.GameEnv(nref, nflips, maxflips = maxflips)
@@ -29,7 +29,7 @@ function returns_vs_nflips(
     return avg
 end
 
-function returns_vs_nflips(nref, nflips, num_trajectories; maxstepfactor = 1.2)
+function returns_vs_nflips(nref, nflips, num_trajectories; maxstepfactor = 1.0)
     maxflips = ceil(Int, maxstepfactor * nflips)
     env = EdgeFlip.GameEnv(nref, nflips, maxflips = maxflips)
     avg = GreedyPolicy.average_normalized_returns(env, num_trajectories)
@@ -37,25 +37,25 @@ function returns_vs_nflips(nref, nflips, num_trajectories; maxstepfactor = 1.2)
     return avg
 end
 
-tree_depth = 3
-max_branching_factor = 3
-nref = 2
-num_actions = 156
+nref = 1
+num_actions = 42
 num_trajectories = 500
-nflip_range = 10:20:150
+nflip_range = [11]
 
 # gret = [returns_vs_nflips(nref, nf, num_trajectories) for nf in nflip_range]
+tree_depth = 20
+max_branching_factor = 3
 tret = [returns_vs_nflips(nref, nf, tree_depth, max_branching_factor, num_trajectories) for nf in nflip_range]
 
 # normalized_nflips = nflip_range ./ num_actions
-plot_returns(
-    normalized_nflips,
-    tret,
-    gd_ret = gret,
-    ylim = [0.75, 1.0],
-    label = "tree",
-    # filename = "results/tree-search/tree-vs-nflips-d-4.png",
-)
+# plot_returns(
+#     normalized_nflips,
+#     tret,
+#     gd_ret = gret,
+#     ylim = [0.75, 1.0],
+#     label = "tree",
+#     # filename = "results/tree-search/tree-vs-nflips-d-4.png",
+# )
 
 # nflips = 8
 # maxflip_range = 1:0.1:3.0
