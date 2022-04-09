@@ -40,12 +40,12 @@ end
 nref = 1
 num_actions = 42
 num_trajectories = 500
-nflip_range = [11]
+nflip_range = 1:5:42
 
 # gret = [returns_vs_nflips(nref, nf, num_trajectories) for nf in nflip_range]
-tree_depth = 20
-max_branching_factor = 3
-tret = [returns_vs_nflips(nref, nf, tree_depth, max_branching_factor, num_trajectories) for nf in nflip_range]
+# tree_depth = 20
+# max_branching_factor = 3
+# tret = [returns_vs_nflips(nref, nf, tree_depth, max_branching_factor, num_trajectories) for nf in nflip_range]
 
 # normalized_nflips = nflip_range ./ num_actions
 # plot_returns(
