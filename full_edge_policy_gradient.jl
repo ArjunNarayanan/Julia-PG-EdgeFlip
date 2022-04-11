@@ -18,8 +18,8 @@ eval_batch(policy, ets, econn) = nothing
 
 function policy_gradient_loss(ets, econn, policy, actions, weights)
     logits = eval_batch(policy, ets, econn)
-    logp = logsoftmax(logits, dims = 2)
-    selected_logp = -[logp[1, action, idx] for (idx, action) in enumerate(actions)]
+    logp = logsoftmax(logits, dims = 1)
+    selected_logp = -[logp[action, idx] for (idx, action) in enumerate(actions)]
     loss = Flux.mean(selected_logp .* weights)
     return loss
 end
@@ -37,6 +37,17 @@ end
 function idx_to_action(idx)
     triangle, vertex = div(idx - 1, 3) + 1, (idx - 1) % 3 + 1
     return triangle, vertex
+end
+
+function reindex_connectivity!(batch_ets, batch_econn)
+    nf, na, nb = size(batch_ets)
+
+    for col in 1:size(batch_econn,2)
+        vals = batch_econn[:,col]
+        vals[vals .!= na + 1] .+= (col - 1)*na
+        vals[vals .== na + 1] .= na*nb + 1
+        batch_econn[:,col] .= vals
+    end
 end
 
 function collect_batch_trajectories(env, policy, batch_size, discount)
@@ -88,6 +99,8 @@ function collect_batch_trajectories(env, policy, batch_size, discount)
 
     batch_ets = cat(batch_ets..., dims = 3)
     batch_econn = cat(batch_econn..., dims = 2)
+
+    reindex_connectivity!(batch_ets, batch_econn)
 
     states = (batch_ets, batch_econn)
 

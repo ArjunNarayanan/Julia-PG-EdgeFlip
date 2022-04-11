@@ -70,46 +70,64 @@ nref = 1
 env = EdgeFlip.FullEdgeGameEnv(nref, 0)
 policy = FullEdgePolicyNL(5,16)
 
-PG.reset!(env)
-ep, econn = PG.state(env)
-l = PG.eval_single(policy, ep, econn)
+# PG.reset!(env)
+# ep, econn = PG.state(env)
+# l = PG.eval_single(policy, ep, econn)
 
-bs, ba, bw, ret = PG.collect_batch_trajectories(env, policy, 10, 1.0)
-ets, econn = bs
-l = PG.eval_batch(policy, ets, econn)
+# bs, ba, bw, ret = PG.collect_batch_trajectories(env, policy, 10, 1.0)
+# ets, econn = bs
+
+# l = PG.eval_batch(policy, ets, econn)
 # loss = PG.policy_gradient_loss(ets, econn, policy, ba, bw)
 
-using BenchmarkTools
+# ep = reshape(ets, 4, :)
+# l2 = PG.eval_single(policy, ep, econn)
+# l1 = eval_batch(policy.emodels[1], ets, econn)
 
-optimizer = ADAM()
-@btime PG.step_epoch(env, policy, optimizer, 10, 0.9)
+# econn2 = copy(econn)
+# econn2[econn2 .== 73] .= 0
+# econn2 = vec(econn2)
+
+# ets2 = reshape(ets, 4, :)
+# econn2[econn2 .== 0] .= size(ets2,2)+1
+
+# l2 = eval_single(policy.emodels[1], ets2, econn2)
+# l1 = reshape(l1, 16, :)
+
+# loss = PG.policy_gradient_loss(ets, econn, policy, ba, bw)
+
+# using BenchmarkTools
+
+# optimizer = ADAM()
+# PG.step_epoch(env, policy, optimizer, 10, 0.9)
+# @btime PG.step_epoch(env, policy, optimizer, 10, 0.9)
 
 # PG.reset!(env)
 # ret = PG.average_normalized_returns(env, policy, 500)
 
-# batch_size = 100
-# num_epochs = 10000
-# learning_rate = 1e-2
-# decay = 0.7
-# decay_step = 500
-# clip = 5e-5
-# discount = 0.9
+batch_size = 100
+num_epochs = 10000
+learning_rate = 1e-2
+decay = 0.7
+decay_step = 500
+clip = 5e-5
+discount = 0.9
 
-# optimizer =
-#     Flux.Optimiser(ExpDecay(learning_rate, decay, decay_step, clip), ADAM(learning_rate))
+optimizer =
+    Flux.Optimiser(ExpDecay(learning_rate, decay, decay_step, clip), ADAM(learning_rate))
 # optimizer = ADAM(1e-2)
 
-# PG.train_and_save_best_models(
-#     env,
-#     policy,
-#     optimizer,
-#     batch_size,
-#     discount,
-#     num_epochs,
-#     evaluate_model,
-#     foldername = "results/models/5L-full-edge/",
-#     generate_plots = false
-# )
+PG.train_and_save_best_models(
+    env,
+    policy,
+    optimizer,
+    batch_size,
+    discount,
+    num_epochs,
+    evaluate_model,
+    foldername = "results/models/5L-full-edge/",
+    generate_plots = false
+)
 
 # PG.reset!(env)
 # initial_score = PG.score(env)

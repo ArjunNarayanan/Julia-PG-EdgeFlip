@@ -35,16 +35,14 @@ function PG.eval_single(p::FullEdgePolicyNL, ep, econn)
 end
 
 function PG.eval_batch(p::FullEdgePolicyNL, ep, econn)
-    x = eval_batch(p.emodels[1], ep, econn)
-    x = relu.(x)
+    nf, na, nb = size(ep)
 
-    for i in 2:length(p.emodels)
-        y = eval_batch(p.emodels[i], x, econn)
-        y = x + y
-        x = relu.(y)
-    end
+    ep = reshape(ep, nf, :)
+    econn = vec(econn)
 
-    logits = p.lmodel(x)
+    logits = PG.eval_single(p, ep, econn)
+    logits = reshape(logits, na, nb)
+
     return logits
 end
 
