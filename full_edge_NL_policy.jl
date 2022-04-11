@@ -1,5 +1,8 @@
 using Flux
 include("full_edge_model.jl")
+include("full_edge_policy_gradient.jl")
+
+PG = FullEdgePolicyGradient
 
 struct FullEdgePolicyNL
     emodels::Any
@@ -17,12 +20,26 @@ struct FullEdgePolicyNL
     end
 end
 
-function (p::FullEdgePolicyNL)(ep, econn)
-    x = p.emodels[1](ep, econn)
+function PG.eval_single(p::FullEdgePolicyNL, ep, econn)
+    x = eval_single(p.emodels[1], ep, econn)
     x = relu.(x)
 
-    for i = 2:length(p.emodels)
-        y = p.emodels[i](x, econn)
+    for i in 2:length(p.emodels)
+        y = eval_single(p.emodels[i], x, econn)
+        y = x + y
+        x = relu.(y)
+    end
+
+    logits = p.lmodel(x)
+    return logits
+end
+
+function PG.eval_batch(p::FullEdgePolicyNL, ep, econn)
+    x = eval_batch(p.emodels[1], ep, econn)
+    x = relu.(x)
+
+    for i in 2:length(p.emodels)
+        y = eval_batch(p.emodels[i], x, econn)
         y = x + y
         x = relu.(y)
     end

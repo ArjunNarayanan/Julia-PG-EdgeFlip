@@ -8,7 +8,7 @@ include("plot.jl")
 
 PG = FullEdgePolicyGradient
 
-function returns_versus_nflips(policy, nref, nflips, num_trajectories; maxstepfactor = 1.2)
+function returns_versus_nflips(policy, nref, nflips, num_trajectories; maxstepfactor = 1.0)
     maxflips = ceil(Int, maxstepfactor * nflips)
     env = EdgeFlip.FullEdgeGameEnv(nref, nflips, maxflips = maxflips)
     avg = PG.average_normalized_returns(env, policy, num_trajectories)
@@ -16,7 +16,7 @@ function returns_versus_nflips(policy, nref, nflips, num_trajectories; maxstepfa
     return avg
 end
 
-function returns_versus_nflips(nref, nflips, num_trajectories; maxstepfactor = 1.2)
+function returns_versus_nflips(nref, nflips, num_trajectories; maxstepfactor = 1.0)
     maxflips = ceil(Int, maxstepfactor * nflips)
     env = EdgeFlip.GameEnv(nref, nflips, maxflips = maxflips)
     avg = GreedyPolicy.average_normalized_returns(env, num_trajectories)
@@ -66,32 +66,17 @@ function evaluate_model(policy; num_trajectories = 500)
 end
 
 
-
 nref = 1
 env = EdgeFlip.FullEdgeGameEnv(nref, 0)
 policy = FullEdgePolicyNL(3,16)
 
 # PG.reset!(env)
 # ep, econn = PG.state(env)
-# l = policy(ep, econn)
+# l = PG.eval_single(policy, ep, econn)
 # bs, ba, bw, ret = PG.collect_batch_trajectories(env, policy, 10, 1.0)
 # ets, econn = bs
 
-# m = policy.emodels[1]
-# ep = ets
-
-# nf, na, nb = size(ep)
-# ep = cat(ep, repeat(m.bvals, inner = (1,1,nb)), dims = 2)
-# ep = reshape(ep, nf, :)
-
-# ep = ep[:, econn]
-# ep = reshape(ep, 6nf, na*nb)
-# ep = m.model(ep)
-# ep = m.batchnorm(ep)
-# ep = reshape(ep, :, na, nb)
-
-
-# l = policy(ets, econn)
+# l = PG.eval_batch(policy, ets, econn)
 # loss = PG.policy_gradient_loss(ets, econn, policy, ba, bw)
 
 # optimizer = ADAM()
@@ -100,26 +85,40 @@ policy = FullEdgePolicyNL(3,16)
 # PG.reset!(env)
 # ret = PG.average_normalized_returns(env, policy, 500)
 
-# batch_size = 100
-# num_epochs = 10000
-# learning_rate = 1e-2
-# decay = 0.7
-# decay_step = 500
-# clip = 5e-5
-# discount = 0.9
+batch_size = 100
+num_epochs = 5000
+learning_rate = 1e-2
+decay = 0.7
+decay_step = 500
+clip = 5e-5
+discount = 0.9
 
-# optimizer =
-#     Flux.Optimiser(ExpDecay(learning_rate, decay, decay_step, clip), ADAM(learning_rate))
-# optimizer = ADAM(5e-6)
+optimizer =
+    Flux.Optimiser(ExpDecay(learning_rate, decay, decay_step, clip), ADAM(learning_rate))
+# optimizer = ADAM(1e-2)
 
-# PG.train_and_save_best_models(
-#     env,
-#     policy,
-#     optimizer,
-#     batch_size,
-#     discount,
-#     num_epochs,
-#     evaluate_model,
-#     foldername = "results/models/3L-full-edge/",
-#     generate_plots = false
-# )
+PG.train_and_save_best_models(
+    env,
+    policy,
+    optimizer,
+    batch_size,
+    discount,
+    num_epochs,
+    evaluate_model,
+    foldername = "results/models/3L-full-edge/",
+    generate_plots = false
+)
+
+# PG.reset!(env)
+# initial_score = PG.score(env)
+
+# ets, econn = PG.state(env)
+# probs = softmax(vec(policy(ets, econn)))
+# action_index = rand(Categorical(probs))
+
+# action = PG.idx_to_action(action_index)
+# PG.step!(env, action)
+
+# new_score = PG.score(env)
+
+# ret = PG.single_trajectory_return(env, policy)

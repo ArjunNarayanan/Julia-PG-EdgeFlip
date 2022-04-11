@@ -13,8 +13,8 @@ reward(env) = nothing
 is_terminated(env) = nothing
 reset!(env) = nothing
 score(env) = nothing
-eval_single(policy, state) = nothing
-eval_batch(policy, state) = nothing
+eval_single(policy, ets, econn, epairs) = nothing
+eval_batch(policy, ets, econn, epair) = nothing
 
 function policy_gradient_loss(ets, econn, epairs, policy, actions, weights)
     logits = eval_batch(policy, ets, econn, epairs)
@@ -200,6 +200,7 @@ function train_and_save_best_models(
     evaluator;
     evaluate_every = 500,
     foldername = "results/models/new-edge-model/",
+    generate_plots = true
 )
 
     ret = evaluator(policy)
@@ -214,11 +215,14 @@ function train_and_save_best_models(
             new_err = sum((1.0 .- new_rets).^2)
 
             if new_err < old_err
-                plot_filename = foldername * "policy-" * string(epoch) * ".png"
-                # plot_returns(new_rets, filename = plot_filename)
+
+                if generate_plots
+                    plot_filename = foldername * "policy-" * string(epoch) * ".png"
+                    plot_returns(new_rets, filename = plot_filename)
+                end
 
                 model_filename = foldername * "policy-" * string(epoch) * ".bson"
-                @save model_filename policy
+                @save model_filename policy new_rets
 
                 ret .= new_rets
 

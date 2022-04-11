@@ -13,8 +13,16 @@ reward(env) = nothing
 is_terminated(env) = nothing
 reset!(env) = nothing
 score(env) = nothing
-# eval_single(policy, state) = nothing
-# eval_batch(policy, state) = nothing
+eval_single(policy, ets, econn) = nothing
+eval_batch(policy, ets, econn) = nothing
+
+function policy_gradient_loss(ets, econn, policy, actions, weights)
+    logits = eval_batch(policy, ets, econn)
+    logp = logsoftmax(logits, dims = 2)
+    selected_logp = -[logp[1, action, idx] for (idx, action) in enumerate(actions)]
+    loss = Flux.mean(selected_logp .* weights)
+    return loss
+end
 
 function advantage(rewards, discount)
     numsteps = length(rewards)
@@ -31,10 +39,9 @@ function idx_to_action(idx)
     return triangle, vertex
 end
 
-
 function collect_batch_trajectories(env, policy, batch_size, discount)
     batch_ets = []
-    batch_econn = Int[]
+    batch_econn = []
     batch_actions = []
     ep_rewards = []
     batch_weights = []
@@ -45,7 +52,7 @@ function collect_batch_trajectories(env, policy, batch_size, discount)
 
     while counter < batch_size
         ets, econn = state(env)
-        logits = vec(policy(ets, econn))
+        logits = vec(eval_single(policy, ets, econn))
         probs = Categorical(softmax(logits))
         action_index = rand(probs)
 
@@ -58,10 +65,8 @@ function collect_batch_trajectories(env, policy, batch_size, discount)
         push!(batch_ets, ets)
 
         num_actions = size(ets, 2)
-        econn .+= counter * (num_actions+1)
-        append!(batch_econn, econn)
+        push!(batch_econn, econn)
 
-        action_index += counter * num_actions
         append!(batch_actions, action_index)
         append!(ep_rewards, r)
 
@@ -71,28 +76,24 @@ function collect_batch_trajectories(env, policy, batch_size, discount)
             ep_ret = advantage(ep_rewards, discount)
             append!(batch_weights, ep_ret)
             append!(batch_returns, sum(ep_rewards))
-            ep_rewards = []
 
-            reset!(env)
-            ep_rewards = []
+            if length(batch_actions) >= batch_size
+                break
+            else
+                reset!(env)
+                ep_rewards = []
+            end
         end
     end
 
-    batch_ets = cat(batch_ets..., dims=3)
+    batch_ets = cat(batch_ets..., dims = 3)
+    batch_econn = cat(batch_econn..., dims = 2)
 
     states = (batch_ets, batch_econn)
 
     avg_return = sum(batch_returns) / length(batch_returns)
 
     return states, batch_actions, batch_weights, avg_return
-end
-
-function policy_gradient_loss(ets, econn, policy, actions, weights)
-    logits = policy(ets, econn)
-    logp = vec(logsoftmax(logits, dims = 2))
-    selected_logp = logp[actions]
-    loss = Flux.mean(selected_logp .* weights)
-    return loss
 end
 
 function step_epoch(env, policy, optimizer, batch_size, discount)
@@ -118,7 +119,7 @@ function single_trajectory_return(env, policy)
         minscore = initial_score
         while !done
             ets, econn = state(env)
-            probs = softmax(vec(policy(ets, econn)))
+            probs = softmax(vec(eval_single(policy, ets, econn)))
             action_index = rand(Categorical(probs))
 
             action = idx_to_action(action_index)
@@ -144,7 +145,7 @@ end
 function average_normalized_returns(env, policy, num_trajectories)
     ret = zeros(num_trajectories)
     for idx = 1:num_trajectories
-        reset!(env, nflips=env.num_initial_flips)
+        reset!(env, nflips = env.num_initial_flips)
         ret[idx] = single_trajectory_normalized_return(env, policy)
     end
     return mean(ret)
@@ -158,9 +159,9 @@ function train_and_save_best_models(
     discount,
     num_epochs,
     evaluator;
-    evaluate_every=500,
-    foldername="results/models/new-edge-model/",
-    generate_plots=true
+    evaluate_every = 500,
+    foldername = "results/models/new-edge-model/",
+    generate_plots = true,
 )
 
     ret = evaluator(policy)
@@ -178,7 +179,7 @@ function train_and_save_best_models(
 
                 if generate_plots
                     plot_filename = foldername * "policy-" * string(epoch) * ".png"
-                    plot_returns(new_rets, filename=plot_filename)
+                    plot_returns(new_rets, filename = plot_filename)
                 end
 
                 model_filename = foldername * "policy-" * string(epoch) * ".bson"
@@ -188,8 +189,7 @@ function train_and_save_best_models(
 
                 average_return = sum(new_rets) / length(new_rets)
 
-                statement =
-                    @sprintf "epoch: %3d \t avg return: %3.2f" epoch average_return
+                statement = @sprintf "epoch: %3d \t avg return: %3.2f" epoch average_return
                 println(statement)
             end
         end
