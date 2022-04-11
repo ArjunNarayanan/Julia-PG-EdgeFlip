@@ -20,37 +20,43 @@ struct FullEdgePolicyNL
     end
 end
 
+function eval_single(p::FullEdgePolicyNL, ep, econn)
+    x = p.emodels[1](ep, econn)
+    x = relu.(x)
+
+    for i in 2:length(p.emodels)
+        y = p.emodels[i](x, econn)
+        y = x + y
+        x = relu.(y)
+    end
+
+    logits = p.lmodel(x)
+    return logits
+end
+
+function eval_batch(p::FullEdgePolicyNL, ep, econn)
+    nf, na, nb = size(ep)
+
+    ep = reshape(ep, nf, na*nb)
+    ep = eval_single(p, ep, econn)
+    ep = reshape(ep, :, na, nb)
+    return ep
+end
+
+function (p::FullEdgePolicyNL)(ep, econn)
+    d = ndims(ep)
+    if d == 2
+        return eval_single(p, ep, econn)
+    elseif d == 3
+        return eval_batch(p, ep, econn)
+    else
+        error("Expected ndims = 2,3 got ndims = $d")
+    end
+end
+
 Flux.@functor FullEdgePolicyNL
 
 function Base.show(io::IO, policy::FullEdgePolicyNL)
     s = "PolicyNL\n\t $(policy.num_levels) levels\n\t $(policy.num_hidden_channels) channels"
     println(io, s)
-end
-
-function PG.eval_single(p::FullEdgePolicyNL, ep, econn)
-    x = eval_single(p.emodels[1], ep, econn)
-    x = relu.(x)
-
-    for i in 2:length(p.emodels)
-        y = eval_single(p.emodels[i], x, econn)
-        y = x + y
-        x = relu.(y)
-    end
-
-    logits = p.lmodel(x)
-    return logits
-end
-
-function PG.eval_batch(p::FullEdgePolicyNL, ep, econn)
-    x = eval_batch(p.emodels[1], ep, econn)
-    x = relu.(x)
-
-    for i in 2:length(p.emodels)
-        y = eval_batch(p.emodels[i], x, econn)
-        y = x + y
-        x = relu.(y)
-    end
-
-    logits = p.lmodel(x)
-    return logits
 end
