@@ -49,14 +49,6 @@ function PG.reward(env::EdgeFlip.FullEdgeGameEnv)
     return EdgeFlip.reward(env)
 end
 
-# function PG.reset!(
-#     env::EdgeFlip.FullEdgeGameEnv;
-#     nflips = rand(1:EdgeFlip.number_of_actions(env)),
-# )
-#     maxflips = ceil(Int, 1.2nflips)
-#     EdgeFlip.reset!(env, nflips = nflips, maxflips = maxflips)
-# end
-
 function PG.reset!(env::EdgeFlip.FullEdgeGameEnv; nflips = 11, maxflipfactor = 1.0)
     maxflips = ceil(Int, maxflipfactor*nflips)
     EdgeFlip.reset!(env, nflips = nflips, maxflips = maxflips)
@@ -68,7 +60,6 @@ end
 
 function evaluate_model(policy; num_trajectories = 500)
     nref = 1
-    # nflip_range = 1:5:42
     nflip_range = [11]
     ret = [returns_versus_nflips(policy, nref, nf, num_trajectories) for nf in nflip_range]
     return ret
@@ -80,16 +71,34 @@ nref = 1
 env = EdgeFlip.FullEdgeGameEnv(nref, 0)
 policy = FullEdgePolicyNL(3,16)
 
-PG.reset!(env)
-ep, econn = PG.state(env)
-l = policy(ep, econn)
-bs, ba, bw, ret = PG.collect_batch_trajectories(env, policy, 10, 1.0)
-ets, econn = bs
-l = policy(ets, econn)
-loss = PG.policy_gradient_loss(ets, econn, policy, ba, bw)
+# PG.reset!(env)
+# ep, econn = PG.state(env)
+# l = policy(ep, econn)
+# bs, ba, bw, ret = PG.collect_batch_trajectories(env, policy, 10, 1.0)
+# ets, econn = bs
 
-optimizer = ADAM()
-PG.step_epoch(env, policy, optimizer, 10, 0.9)
+# m = policy.emodels[1]
+# ep = ets
+
+# nf, na, nb = size(ep)
+# ep = cat(ep, repeat(m.bvals, inner = (1,1,nb)), dims = 2)
+# ep = reshape(ep, nf, :)
+
+# ep = ep[:, econn]
+# ep = reshape(ep, 6nf, na*nb)
+# ep = m.model(ep)
+# ep = m.batchnorm(ep)
+# ep = reshape(ep, :, na, nb)
+
+
+# l = policy(ets, econn)
+# loss = PG.policy_gradient_loss(ets, econn, policy, ba, bw)
+
+# optimizer = ADAM()
+# PG.step_epoch(env, policy, optimizer, 10, 0.9)
+
+# PG.reset!(env)
+# ret = PG.average_normalized_returns(env, policy, 500)
 
 # batch_size = 100
 # num_epochs = 10000
@@ -102,10 +111,6 @@ PG.step_epoch(env, policy, optimizer, 10, 0.9)
 # optimizer =
 #     Flux.Optimiser(ExpDecay(learning_rate, decay, decay_step, clip), ADAM(learning_rate))
 # optimizer = ADAM(5e-6)
-
-# PG.reset!(env)
-# ret = PG.average_normalized_returns(env, policy, 500)
-
 
 # PG.train_and_save_best_models(
 #     env,

@@ -56,8 +56,9 @@ function collect_batch_trajectories(env, policy, batch_size, discount)
         done = is_terminated(env)
 
         push!(batch_ets, ets)
+
         num_actions = size(ets, 2)
-        econn .+= counter * num_actions
+        econn .+= counter * (num_actions+1)
         append!(batch_econn, econn)
 
         action_index += counter * num_actions
@@ -78,9 +79,6 @@ function collect_batch_trajectories(env, policy, batch_size, discount)
     end
 
     batch_ets = cat(batch_ets..., dims=3)
-
-    nf, na, nb = size(batch_ets)
-    batch_econn[batch_econn .== 0] .= na*nb+1
 
     states = (batch_ets, batch_econn)
 

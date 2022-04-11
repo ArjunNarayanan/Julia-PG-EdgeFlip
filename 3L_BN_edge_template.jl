@@ -76,10 +76,12 @@ env = EdgeFlip.OrderedGameEnv(nref, 0)
 num_actions = EdgeFlip.number_of_actions(env)
 policy = PolicyNL(3, 16)
 
-# PG.reset!(env)
-# ep, econn, epairs = PG.state(env)
-# l = PG.eval_single(policy, ep, econn, epairs)
-# bs, ba, bw, ret = PG.collect_batch_trajectories(env, policy, 10, 1.0)
+PG.reset!(env)
+ep, econn, epairs = PG.state(env)
+l = PG.eval_single(policy, ep, econn, epairs)
+bs, ba, bw, ret = PG.collect_batch_trajectories(env, policy, 10, 1.0)
+ep, econn, epairs = bs
+v = eval_batch(policy.emodels[1], ep, econn, epairs)
 # l = PG.eval_batch(policy, bs[1], bs[2], bs[3])
 
 # num_trajectories = 500
@@ -88,28 +90,28 @@ policy = PolicyNL(3, 16)
 # normalized_nflips = nflip_range ./ num_actions
 
 # num_trajectories = 500
-batch_size = 100
-num_epochs = 10000
-learning_rate = 1e-2
-decay = 0.7
-decay_step = 500
-clip = 5e-5
-discount = 0.8
+# batch_size = 100
+# num_epochs = 10000
+# learning_rate = 1e-2
+# decay = 0.7
+# decay_step = 500
+# clip = 5e-5
+# discount = 0.8
 
-optimizer =
-    Flux.Optimiser(ExpDecay(learning_rate, decay, decay_step, clip), ADAM(learning_rate))
+# optimizer =
+#     Flux.Optimiser(ExpDecay(learning_rate, decay, decay_step, clip), ADAM(learning_rate))
 
-optimizer = ADAM(5e-6)
-PG.train_and_save_best_models(
-    env,
-    policy,
-    optimizer,
-    batch_size,
-    discount,
-    num_epochs,
-    evaluate_model,
-    foldername = "results/models/3L-model/"
-)
+# optimizer = ADAM(5e-6)
+# PG.train_and_save_best_models(
+#     env,
+#     policy,
+#     optimizer,
+#     batch_size,
+#     discount,
+#     num_epochs,
+#     evaluate_model,
+#     foldername = "results/models/3L-model/"
+# )
 
 # using BSON: @load
 

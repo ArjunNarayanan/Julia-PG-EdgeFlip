@@ -15,7 +15,7 @@ struct PolicyNL
             push!(emodels, EdgeModel(num_hidden_channels, num_hidden_channels))
         end
 
-        lmodel = Dense(16, 1)
+        lmodel = Dense(num_hidden_channels, 1)
         new(emodels, lmodel, num_levels, num_hidden_channels)
     end
 end

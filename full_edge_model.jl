@@ -10,7 +10,9 @@ struct FullEdgeModel
     end
 end
 
-function (em::FullEdgeModel)(ep, econn)
+Flux.@functor FullEdgeModel
+
+function eval_single(em::FullEdgeModel, ep, econn)
     nf, na = size(ep)
 
     ep = cat(ep, em.bvals, dims = 2)
@@ -22,4 +24,34 @@ function (em::FullEdgeModel)(ep, econn)
     return ep
 end
 
-Flux.@functor FullEdgeModel
+function eval_batch(em::FullEdgeModel, ep, econn)
+    nf, na, nb = size(ep)
+
+    ep = cat(ep, repeat(em.bvals, inner = (1, 1, nb)), dims = 2)
+    ep = reshape(ep, nf, :)
+    ep = ep[:, econn]
+
+    ep = reshape(ep, 6nf, na*nb)
+    ep = em.model(ep)
+
+    ep = em.batchnorm(ep)
+
+    ep = reshape(ep, :, na, nb)
+
+    return ep
+end
+
+function (em::FullEdgeModel)(ep, econn)
+    
+    d = ndims(ep)
+
+    if d == 2
+        return eval_single(em, ep, econn)
+    elseif d == 3
+        return eval_batch(em, ep, econn)
+    else
+        error("Expected d == 2, 3 got d == $d")
+    end
+
+    return ep
+end
