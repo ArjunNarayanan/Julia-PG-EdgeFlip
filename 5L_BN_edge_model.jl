@@ -77,7 +77,6 @@ end
 nref = 1
 
 env = EdgeFlip.OrderedGameEnv(nref, 0)
-num_actions = EdgeFlip.number_of_actions(env)
 policy = PolicyNL(5,16)
 
 # PG.reset!(env)
@@ -98,7 +97,7 @@ learning_rate = 1e-2
 decay = 0.7
 decay_step = 500
 clip = 5e-5
-discount = 0.8
+discount = 0.9
 
 optimizer =
     Flux.Optimiser(ExpDecay(learning_rate, decay, decay_step, clip), ADAM(learning_rate))
@@ -115,13 +114,13 @@ PG.train_and_save_best_models(
     foldername = "results/models/5L-model/"
 )
 
-using BSON: @load
+# using BSON: @load
 
-@load "results/models/5L-model/policy-7500.bson" policy
+# @load "results/models/5L-model/policy-7500.bson" policy
 
 # PG.run_training_loop(env, policy, optimizer, batch_size, discount, num_epochs)
 # nflip_range = [11]
-nn_ret = [returns_versus_nflips(policy, nref, nf, num_trajectories) for nf in nflip_range]
+# nn_ret = [returns_versus_nflips(policy, nref, nf, num_trajectories) for nf in nflip_range]
 # plot_returns(normalized_nflips, nn_ret, gd_ret = gd_ret, ylim = [0.75, 1])
 
 # filename = "results/new-edge-model/3L-res-performance.png"
