@@ -19,8 +19,13 @@ function TS.state(env::EdgeFlip.OrderedGameEnv)
 end
 
 function TS.step!(env::EdgeFlip.OrderedGameEnv, action)
-    triangle, vertex = action
+    triangle, vertex = div(action - 1, 3) + 1, (action - 1) % 3 + 1
     EdgeFlip.step!(env, triangle, vertex)
+end
+
+function TS.reverse_step!(env::EdgeFlip.OrderedGameEnv, action)
+    triangle, vertex = div(action - 1, 3) + 1, (action - 1) % 3 + 1
+    EdgeFlip.reverse_step!(env, triangle, vertex)
 end
 
 function TS.reset!(env::EdgeFlip.OrderedGameEnv; nflips = 11, maxflipfactor = 1.0)
@@ -28,10 +33,29 @@ function TS.reset!(env::EdgeFlip.OrderedGameEnv; nflips = 11, maxflipfactor = 1.
     EdgeFlip.reset!(env, nflips = nflips, maxflips = maxflips)
 end
 
+function TS.action_probabilities_and_value(policy, state)
+    ets, econn, epairs = state
+    p, v = PV.eval_single(policy, ets, econn, epairs)
+    return p, v
+end
+
+function TS.is_terminal(env)
+    EdgeFlip.done(env)
+end
+
+function TS.reward(env)
+    r = EdgeFlip.reward(env)
+    optimum = r + EdgeFlip.score(env) - EdgeFlip.optimum_score(env)
+    return r/optimum
+end
 
 nref = 1
 env = EdgeFlip.OrderedGameEnv(nref, 0)
 TS.reset!(env)
-pvnet = PV.PVNet(3, 16)
 
-ets, econn, epairs = TS.state(env)
+policy = PV.PVNet(3, 16)
+p, v = TS.action_probabilities_and_value(policy, TS.state(env))
+
+root = TS.Node(p)
+node, action = TS.select(root, env, 1)
+child, val = TS.expand(node, action, env, policy)

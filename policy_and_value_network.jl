@@ -40,12 +40,11 @@ function eval_single(p::PVNet, ep, econn, epairs)
         x = relu.(y)
     end
 
-    p = softmax(vec(p.pmodel(x)))
+    probs = softmax(vec(p.pmodel(x)))
     
-    z = sum(x,dims=2)
-    v = p.vmodel(z)
+    val = sum(p.vmodel(x))
 
-    return p, v
+    return probs, val
 end
 
 end
