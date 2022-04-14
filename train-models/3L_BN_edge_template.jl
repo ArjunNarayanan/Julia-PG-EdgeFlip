@@ -1,10 +1,10 @@
 using Printf
 using Flux
 using EdgeFlip
-include("edge_policy_gradient.jl")
-include("NL_policy.jl")
-include("greedy_policy.jl")
-include("plot.jl")
+include("../edge_policy_gradient.jl")
+include("../NL_policy.jl")
+include("../greedy_policy.jl")
+# include("plot.jl")
 
 PG = EdgePolicyGradient
 
@@ -89,7 +89,7 @@ policy = PolicyNL(3, 16)
 # gd_ret = [returns_versus_nflips(nref, nf, num_trajectories) for nf in nflip_range]
 # normalized_nflips = nflip_range ./ num_actions
 
-# num_trajectories = 500
+num_trajectories = 500
 batch_size = 100
 num_epochs = 10000
 learning_rate = 1e-2
