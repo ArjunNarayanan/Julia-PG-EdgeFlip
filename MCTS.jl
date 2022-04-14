@@ -2,6 +2,10 @@ module MCTS
 
 using OrderedCollections
 
+state(env) = nothing
+step!(env, action) = nothing
+reset!(env) = nothing
+
 struct Node
     parent::Union{Nothing,Node}
     action::Int # integer action that brings me to this state from parent
