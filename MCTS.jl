@@ -129,7 +129,7 @@ function Node(parent, action, reward, prior_probabilities, terminal)
 end
 
 # constructor to make root node
-function Node(prior_probabilities; terminal = false)
+function Node(prior_probabilities, terminal)
 
     return Node(
         nothing,
@@ -235,20 +235,24 @@ function move_to_root!(node, env)
     end
 end
 
-function search(env, policy, Cpuct, discount, maxtime)
-    p, v = action_probabilities_and_value(policy, state(env))
-    root = Node(p)
+function search(root, env, policy, Cpuct, discount, maxtime)
+
     terminal = is_terminal(root)
     start_time = time()
     elapsed = 0.0
     
     while !terminal && elapsed < maxtime
-        
-        node, action = select(root, env, Cpuct)
-        child, val = expand(node, action, env, policy)
-        root = backup(child, val, discount, env)
 
-        terminal = is_terminal(child)
+        node, action = select(root, env, Cpuct)
+        terminal = is_terminal(node)
+
+        if !terminal
+            child, val = expand(node, action, env, policy)
+            root = backup(child, val, discount, env)
+        else
+            root = move_to_root!(node, env)
+        end
+
         elapsed = time() - start_time
     end
     return root
@@ -264,19 +268,20 @@ function mcts_action_probabilities(visit_count, number_of_actions, temperature)
     return action_probabilities
 end
 
-function step_mcts!(batch_data, env, policy, Cpuct, discount, maxtime, temperature)
+# fix this function!
+# function step_mcts!(batch_data, env, policy, Cpuct, discount, maxtime, temperature)
     
-    root = search(env, policy, Cpuct, discount, maxtime)
-    na = number_of_actions(root)
+#     root = search(env, policy, Cpuct, discount, maxtime)
+#     na = number_of_actions(root)
 
-    action_probs = mcts_action_probabilities(visit_count(root), na, temperature)
-    action = rand(Categorical(action_probs))
+#     action_probs = mcts_action_probabilities(visit_count(root), na, temperature)
+#     action = rand(Categorical(action_probs))
 
-    step!(env, action)
-    r = reward(env)
+#     step!(env, action)
+#     r = reward(env)
 
-    update!(batch_data, state(env), action_probs, r)
-end
+#     update!(batch_data, state(env), action_probs, r)
+# end
 
 struct BatchData
     state_data::Any

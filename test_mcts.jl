@@ -95,9 +95,13 @@ discount = 1.0
 maxtime = 0.1
 
 TS.reset!(env)
-batch_data = TS.BatchData(StateData())
 
-TS.step_mcts!(batch_data, env, policy, Cpuct, discount, maxtime, temperature)
+p, v = TS.action_probabilities_and_value(policy, TS.state(env))
+root = TS.Node(p, TS.is_terminal(env))
+root = TS.search(root, env, policy, Cpuct, discount, maxtime)
+
+# batch_data = TS.BatchData(StateData())
+# TS.step_mcts!(batch_data, env, policy, Cpuct, discount, maxtime, temperature)
 
 # root = TS.search(env, policy, Cpuct, discount, maxtime)
 # ap = TS.mcts_action_probabilities(root.visit_count, 72, 1.0)
