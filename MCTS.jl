@@ -1,15 +1,16 @@
 module MCTS
 
 using OrderedCollections
+using Distributions: Categorical
 
+# methods that need to be overloaded
 state(env) = nothing
 step!(env, action) = nothing
 reverse_step!(env, action) = nothing
 reset!(env) = nothing
 action_probabilities_and_value(policy, state) = nothing
-is_terminal(env) = nothing
 reward(env) = nothing
-
+update!(state_data, env) = nothing
 
 struct Node
     parent::Union{Nothing,Node}
@@ -65,6 +66,10 @@ end
 
 function prior_probabilities(n::Node)
     return n.prior_probabilities
+end
+
+function number_of_actions(n::Node)
+    return length(prior_probabilities(n))
 end
 
 function is_terminal(n::Node)
@@ -193,6 +198,10 @@ function expand(parent, action, env, policy)
     return child, val
 end
 
+function parent_value(reward, value, discount)
+    return reward + discount*value*(1 - reward)
+end
+
 function backup(node, value, discount, env)
     if has_parent(node)
         p = parent(node)
@@ -204,7 +213,7 @@ function backup(node, value, discount, env)
         r = reward(node)
 
         N[a] += 1
-        update = r + discount*value*(1-r)
+        update = parent_value(r, value, discount)
         W[a] += update
         Q[a] = W[a]/N[a]
 
@@ -214,6 +223,86 @@ function backup(node, value, discount, env)
     else
         return node
     end
+end
+
+function move_to_root!(node, env)
+    if has_parent(node)
+        a = action(node)
+        reverse_step!(env, a)
+        move_to_root!(parent(node), env)
+    else
+        return node
+    end
+end
+
+function search(env, policy, Cpuct, discount, maxtime)
+    p, v = action_probabilities_and_value(policy, state(env))
+    root = Node(p)
+    terminal = is_terminal(root)
+    start_time = time()
+    elapsed = 0.0
+    
+    while !terminal && elapsed < maxtime
+        
+        node, action = select(root, env, Cpuct)
+        child, val = expand(node, action, env, policy)
+        root = backup(child, val, discount, env)
+
+        terminal = is_terminal(child)
+        elapsed = time() - start_time
+    end
+    return root
+end
+
+function mcts_action_probabilities(visit_count, number_of_actions, temperature)
+    action_probabilities = zeros(number_of_actions)
+    for (key, value) in visit_count
+        action_probabilities[key] = value
+    end
+    action_probabilities .^= (1.0/temperature)
+    action_probabilities ./= sum(action_probabilities)
+    return action_probabilities
+end
+
+function step_mcts!(batch_data, env, policy, Cpuct, discount, maxtime, temperature)
+    
+    root = search(env, policy, Cpuct, discount, maxtime)
+    na = number_of_actions(root)
+
+    action_probs = mcts_action_probabilities(visit_count(root), na, temperature)
+    action = rand(Categorical(action_probs))
+
+    step!(env, action)
+    r = reward(env)
+
+    update!(batch_data, state(env), action_probs, r)
+end
+
+struct BatchData
+    state_data::Any
+    action_probabilities::Any
+    rewards::Any
+    function BatchData(state_data)
+        action_probabilities = Vector{Vector{Float64}}(undef,0)
+        reward = Float64[]
+        new(state_data, action_probabilities, reward)
+    end
+end
+
+function Base.length(data::BatchData)
+    return length(data.action_probabilities)
+end
+
+function Base.show(io::IO, data::BatchData)
+    num_data = length(data)
+    println(io, "BatchData")
+    println(io, "\t$num_data data points")
+end
+
+function update!(batch_data::BatchData, state, action_probabilities, reward)
+    update!(batch_data.state_data, state)
+    push!(batch_data.action_probabilities, action_probabilities)
+    append!(batch_data.rewards, reward)
 end
 
 # end module

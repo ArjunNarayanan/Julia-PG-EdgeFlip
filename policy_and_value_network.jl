@@ -16,7 +16,7 @@ struct PVNet
         end
         pmodel = Chain(Dense(num_hidden_channels, num_hidden_channels, relu),
                        Dense(num_hidden_channels, 1))
-        vmodel = Chain(Dense(num_hidden_channels, num_hidden_channels, relu),
+        vmodel = Chain(Dense(num_hidden_channels + 1, num_hidden_channels, relu),
                        Dense(num_hidden_channels, 1))
 
         new(emodels, pmodel, vmodel, num_levels, num_hidden_channels)
@@ -30,7 +30,7 @@ function Base.show(io::IO, policy::PVNet)
     println(io, s)
 end
 
-function eval_single(p::PVNet, ep, econn, epairs)
+function eval_single(p::PVNet, ep, econn, epairs, normalized_remaining_flips)
     x = eval_single(p.emodels[1], ep, econn, epairs)
     x = relu.(x)
 
@@ -42,7 +42,9 @@ function eval_single(p::PVNet, ep, econn, epairs)
 
     probs = softmax(vec(p.pmodel(x)))
     
-    val = sum(p.vmodel(x))
+    mean_x = sum(x, dims = 2)/size(x,2)
+    x = vcat(mean_x, normalized_remaining_flips)
+    val = first(p.vmodel(x))
 
     return probs, val
 end
