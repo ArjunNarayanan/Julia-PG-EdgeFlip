@@ -67,6 +67,10 @@ function prior_probabilities(n::Node)
     return n.prior_probabilities
 end
 
+function is_terminal(n::Node)
+    return n.terminal
+end
+
 function mean_action_values(n::Node)
     return n.mean_action_values
 end
@@ -207,6 +211,8 @@ function backup(node, value, discount, env)
         reverse_step!(env, a)
         
         backup(p, update, discount, env)
+    else
+        return node
     end
 end
 

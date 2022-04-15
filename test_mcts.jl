@@ -39,7 +39,7 @@ function TS.action_probabilities_and_value(policy, state)
     return p, v
 end
 
-function TS.is_terminal(env)
+function TS.is_terminal(env::EdgeFlip.OrderedGameEnv)
     EdgeFlip.done(env)
 end
 
@@ -59,3 +59,7 @@ p, v = TS.action_probabilities_and_value(policy, TS.state(env))
 root = TS.Node(p)
 node, action = TS.select(root, env, 1)
 child, val = TS.expand(node, action, env, policy)
+# root = TS.backup(child, val, 1.0, env)
+
+# node, action = TS.select(root, env, 1)
+# child, val = TS.expand(node, action, env, policy)
