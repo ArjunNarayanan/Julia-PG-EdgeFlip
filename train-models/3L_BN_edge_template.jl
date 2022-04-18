@@ -73,7 +73,6 @@ end
 nref = 1
 
 env = EdgeFlip.OrderedGameEnv(nref, 0)
-num_actions = EdgeFlip.number_of_actions(env)
 policy = PolicyNL(3, 16)
 
 # PG.reset!(env)
@@ -100,7 +99,7 @@ discount = 0.8
 
 optimizer =
     Flux.Optimiser(ExpDecay(learning_rate, decay, decay_step, clip), ADAM(learning_rate))
-# optimizer = ADAM(5e-6)
+# # optimizer = ADAM(5e-6)
 
 PG.train_and_save_best_models(
     env,
@@ -114,16 +113,16 @@ PG.train_and_save_best_models(
     generate_plots = false
 )
 
-# using BSON: @load
+# # using BSON: @load
 
-# @load "results/models/new-edge-model/3L.bson" policy
+# # @load "results/models/new-edge-model/3L.bson" policy
 
-# PG.run_training_loop(env, policy, optimizer, batch_size, discount, num_epochs)
-# nn_ret = [returns_versus_nflips(policy, nref, nf, num_trajectories) for nf in nflip_range]
-# plot_returns(normalized_nflips, nn_ret, gd_ret = gd_ret, ylim = [0.75, 1])
+# # PG.run_training_loop(env, policy, optimizer, batch_size, discount, num_epochs)
+# # nn_ret = [returns_versus_nflips(policy, nref, nf, num_trajectories) for nf in nflip_range]
+# # plot_returns(normalized_nflips, nn_ret, gd_ret = gd_ret, ylim = [0.75, 1])
 
-# filename = "results/new-edge-model/3L-res-performance.png"
-# plot_returns(normalized_nflips, nn_ret, gd_ret = gd_ret, ylim = [0.75, 1], filename = filename)
+# # filename = "results/new-edge-model/3L-res-performance.png"
+# # plot_returns(normalized_nflips, nn_ret, gd_ret = gd_ret, ylim = [0.75, 1], filename = filename)
 
-# using BSON: @save
-# @save "results/models/new-edge-model/3L.bson" policy
+# # using BSON: @save
+# # @save "results/models/new-edge-model/3L.bson" policy
