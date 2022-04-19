@@ -372,6 +372,25 @@ function update!(batch_data::BatchData, state, action_probabilities, action, rew
     append!(batch_data.terminal, terminal)
 end
 
+function batch_target(b::BatchData, discount)
+    action_probabilities = cat(b.action_probabilities..., dims = 2)
+    state_values = backup_state_value(b.rewards, b.terminal, discount)
+
+    return action_probabilities, state_values
+end
+
+function evaluate_loss(policy_logprobs, policy_vals, target_probs, target_vals, weights, l2_coeff)
+    @assert size(policy_probs) == size(target_probs)
+    @assert length(policy_vals) == length(target_vals)
+
+    p1 = -vec(sum(target_probs .* (policy_logprobs), dims=1))
+
+end
+
+function loss(policy, state, target_probabilities, target_values)
+
+end
+
 # end module
 end
 # end module

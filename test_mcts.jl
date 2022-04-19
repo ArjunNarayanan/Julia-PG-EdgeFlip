@@ -15,14 +15,14 @@ Cpuct = 1.0
 temperature = 1.0
 discount = 1.0
 maxtime = 1e-2
-batch_size = 55
+batch_size = 50
 
-batch_data = TS.BatchData(StateData(EdgeFlip.edge_connectivity(env)))
+data = TS.BatchData(StateData(EdgeFlip.edge_connectivity(env)))
+TS.collect_batch_data!(data, env, policy, Cpuct, discount, maxtime, temperature, batch_size)
 
-TS.collect_batch_data!(batch_data, env, policy, Cpuct, discount, maxtime, temperature, batch_size)
+ets, econn, epairs, nflips = batch_data(data.state_data)
+policy_probs, policy_vals = PV.eval_batch(policy, ets, econn, epairs, nflips)
+target_probs, target_vals = TS.batch_target(data, discount)
 
-s = batch_data.state_data
-
-ets = cat(s.edge_template_score...,dims=3)
-econn = s.edge_connectivity
-epairs = cat(s.edge_pairs...,dims=2)
+# ets, econn, epairs = batch_data(s)
+# h = PV.eval_batch(policy.emodels[1], ets, econn, epairs)

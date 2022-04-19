@@ -18,6 +18,26 @@ function Base.length(s::StateData)
     return length(s.edge_template_score)
 end
 
+function offset_edge_pairs!(epairs)
+    na,nb = size(epairs)
+    for (idx,col) in enumerate(eachcol(epairs))
+        col .+= (idx-1)*na
+    end
+end
+
+function batch_data(s::StateData)
+    ets = cat(s.edge_template_score..., dims = 3)
+    econn = s.edge_connectivity
+    
+    epairs = cat(s.edge_pairs..., dims = 2)
+    offset_edge_pairs!(epairs)
+    epairs = vec(epairs)
+
+    nflips = s.normalized_remaining_flips
+
+    return ets, econn, epairs, nflips
+end
+
 function Base.show(io::IO, s::StateData)
     l = length(s)
     println(io, "StateData")
