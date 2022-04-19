@@ -40,13 +40,13 @@ function eval_single(p::PVNet, ep, econn, epairs, normalized_remaining_flips)
         x = relu.(y)
     end
 
-    probs = softmax(vec(p.pmodel(x)))
+    logits = vec(p.pmodel(x))
     
     mean_x = sum(x, dims = 2)/size(x,2)
     x = vcat(mean_x, normalized_remaining_flips)
     val = first(p.vmodel(x))
 
-    return probs, val
+    return logits, val
 end
 
 function eval_batch(p::PVNet, ep, econn, epairs, normalized_remaining_flips)
@@ -61,14 +61,13 @@ function eval_batch(p::PVNet, ep, econn, epairs, normalized_remaining_flips)
 
     nf, na, nb = size(x)
     logits = reshape(p.pmodel(x), na, nb)
-    probs = softmax(logits, dims=1)
 
     mean_x = sum(x, dims = 2)/size(x,2)
     mean_x = reshape(mean_x, nf, nb)
     mean_x = vcat(mean_x, normalized_remaining_flips')
     vals = vec(p.vmodel(mean_x))
 
-    return probs, vals
+    return logits, vals
 end
 
 end

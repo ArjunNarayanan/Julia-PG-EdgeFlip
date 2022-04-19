@@ -1,3 +1,4 @@
+using Flux
 include("MCTS.jl")
 TS = MCTS
 
@@ -6,7 +7,8 @@ struct StateData
     edge_connectivity::Any
     edge_pairs::Any
     normalized_remaining_flips::Any
-    function StateData(edge_connectivity)
+    function StateData(env)
+        edge_connectivity = EdgeFlip.edge_connectivity(env)
         edge_template_score = Vector{Matrix{Int}}(undef, 0)
         edge_pairs = Vector{Vector{Int}}(undef, 0)
         normalized_remaining_flips = Float64[]
@@ -25,7 +27,7 @@ function offset_edge_pairs!(epairs)
     end
 end
 
-function batch_data(s::StateData)
+function TS.batch_state(s::StateData)
     ets = cat(s.edge_template_score..., dims = 3)
     econn = s.edge_connectivity
     
@@ -95,6 +97,22 @@ end
 
 function TS.action_probabilities_and_value(policy, state)
     ets, econn, epairs, normalized_remaining_flips = state
-    p, v = PV.eval_single(policy, ets, econn, epairs, normalized_remaining_flips)
+    logits, v = PV.eval_single(policy, ets, econn, epairs, normalized_remaining_flips)
+
+    p = softmax(logits)
+
     return p, v
+end
+
+function TS.batch_action_logprobs_and_values(policy, state)
+    ets, econn, epairs, normalized_remaining_flips = state
+
+    logits, vals = PV.eval_batch(policy, ets, econn, epairs, normalized_remaining_flips)
+    logprobs = logsoftmax(logits, dims = 1)
+
+    return logprobs, vals
+end
+
+function TS.initialize_state_data(env)
+    return StateData(env)
 end

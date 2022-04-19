@@ -1,5 +1,6 @@
 module MCTS
 
+using Flux
 using Distributions: Categorical
 
 # methods that need to be overloaded
@@ -8,8 +9,11 @@ step!(env, action) = nothing
 reverse_step!(env, action) = nothing
 reset!(env) = nothing
 action_probabilities_and_value(policy, state) = nothing
+batch_action_logprobs_and_values(policy, state) = nothing
 reward(env) = nothing
 update!(state_data, env) = nothing
+initialize_state_data(env) = nothing
+batch_state(state_data) = nothing
 
 mutable struct Node
     parent::Union{Nothing,Node}
@@ -140,14 +144,7 @@ end
 # constructor to make root node
 function Node(prior_probabilities, value, terminal)
 
-    return Node(
-        nothing,
-        0,
-        0.0,
-        prior_probabilities,
-        value,
-        terminal,
-    )
+    return Node(nothing, 0, 0.0, prior_probabilities, value, terminal)
 end
 
 function PUCT_exploration(prior_probs, visit_count, Cpuct)
@@ -213,7 +210,7 @@ function expand!(parent, action, env, policy)
 end
 
 function parent_value(reward, value, discount)
-    return reward + discount*value*(1 - reward)
+    return reward + discount * value * (1 - reward)
 end
 
 function backup!(node, value, discount, env)
@@ -229,10 +226,10 @@ function backup!(node, value, discount, env)
         N[a] += 1
         update = parent_value(r, value, discount)
         W[a] += update
-        Q[a] = W[a]/N[a]
+        Q[a] = W[a] / N[a]
 
         reverse_step!(env, a)
-        
+
         backup!(p, update, discount, env)
     else
         return
@@ -274,14 +271,14 @@ function mcts_action_probabilities(visit_count, number_of_actions, temperature)
     for (key, value) in visit_count
         action_probabilities[key] = value
     end
-    action_probabilities .^= (1.0/temperature)
+    action_probabilities .^= (1.0 / temperature)
     action_probabilities ./= sum(action_probabilities)
     return action_probabilities
 end
 
 function step_mcts!(batch_data, root, env, policy, Cpuct, discount, maxtime, temperature)
     s = state(env)
-    
+
     search!(root, env, policy, Cpuct, discount, maxtime)
     na = number_of_actions(root)
 
@@ -292,36 +289,62 @@ function step_mcts!(batch_data, root, env, policy, Cpuct, discount, maxtime, tem
     r = reward(env)
     c = child(root, action)
     t = is_terminal(c)
-    
+
     update!(batch_data, s, action_probs, action, r, t)
 
     set_parent!(c, nothing)
-    
+
     return c
 end
 
-function collect_sample_trajectory!(batch_data, env, policy, Cpuct, discount, maxtime, temperature)
+function collect_sample_trajectory!(
+    batch_data,
+    env,
+    policy,
+    Cpuct,
+    discount,
+    maxtime,
+    temperature,
+)
     reset!(env)
     p, v = action_probabilities_and_value(policy, state(env))
     terminal = is_terminal(env)
     root = Node(p, v, terminal)
 
     while !terminal
-        root = step_mcts!(batch_data, root, env, policy, Cpuct, discount, maxtime, temperature)
+        root =
+            step_mcts!(batch_data, root, env, policy, Cpuct, discount, maxtime, temperature)
         terminal = is_terminal(root)
     end
 end
 
-function collect_batch_data!(batch_data, env, policy, Cpuct, discount, maxtime, temperature, batch_size)
+function collect_batch_data!(
+    batch_data,
+    env,
+    policy,
+    Cpuct,
+    discount,
+    maxtime,
+    temperature,
+    batch_size,
+)
     while length(batch_data) < batch_size
-        collect_sample_trajectory!(batch_data, env, policy, Cpuct, discount, maxtime, temperature)
+        collect_sample_trajectory!(
+            batch_data,
+            env,
+            policy,
+            Cpuct,
+            discount,
+            maxtime,
+            temperature,
+        )
     end
 end
 
 function backup_state_value(rewards, terminal, discount)
     l = length(rewards)
     @assert l == length(terminal)
-    
+
     values = zeros(l)
     counter = 0
     v = 0.0
@@ -331,7 +354,7 @@ function backup_state_value(rewards, terminal, discount)
             counter = 0
             v = 0.0
         end
-        v = rewards[idx] + discount*v
+        v = rewards[idx] + discount * v
         values[idx] = v
         counter += 1
     end
@@ -342,9 +365,9 @@ end
 struct BatchData
     state_data::Any
     action_probabilities::Any
-    actions
+    actions::Any
     rewards::Any
-    terminal
+    terminal::Any
     function BatchData(state_data)
         action_probabilities = Vector{Float64}[]
         actions = Int64[]
@@ -358,13 +381,24 @@ function Base.length(data::BatchData)
     return length(data.action_probabilities)
 end
 
+function state_data(data::BatchData)
+    return data.state_data
+end
+
 function Base.show(io::IO, data::BatchData)
     num_data = length(data)
     println(io, "BatchData")
     println(io, "\t$num_data data points")
 end
 
-function update!(batch_data::BatchData, state, action_probabilities, action, reward, terminal)
+function update!(
+    batch_data::BatchData,
+    state,
+    action_probabilities,
+    action,
+    reward,
+    terminal,
+)
     update!(batch_data.state_data, state)
     push!(batch_data.action_probabilities, action_probabilities)
     append!(batch_data.actions, action)
@@ -379,16 +413,92 @@ function batch_target(b::BatchData, discount)
     return action_probabilities, state_values
 end
 
-function evaluate_loss(policy_logprobs, policy_vals, target_probs, target_vals, weights, l2_coeff)
-    @assert size(policy_probs) == size(target_probs)
+function evaluate_loss(
+    policy_logprobs,
+    policy_vals,
+    target_probs,
+    target_vals,
+    weights,
+    l2_coeff,
+)
+    @assert size(policy_logprobs) == size(target_probs)
     @assert length(policy_vals) == length(target_vals)
 
-    p1 = -vec(sum(target_probs .* (policy_logprobs), dims=1))
+    p1 = Flux.mean(-vec(sum(target_probs .* (policy_logprobs), dims = 1)))
+    p2 = Flux.mean(abs2, (policy_vals - target_vals))
 
+    sqnorm(w) = sum(abs2, w)
+    p3 = l2_coeff * sum(sqnorm, weights)
+
+    l = p1 + p2 + p3
+    return l
 end
 
-function loss(policy, state, target_probabilities, target_values)
+function loss(policy, state, target_probabilities, target_values, l2_coeff)
+    policy_logprobs, policy_vals = batch_action_logprobs_and_values(policy, state)
+    weights = params(policy)
+    l = evaluate_loss(
+        policy_logprobs,
+        policy_vals,
+        target_probabilities,
+        target_values,
+        weights,
+        l2_coeff,
+    )
+    return l
+end
 
+function step_epoch!(
+    policy,
+    env,
+    optimizer,
+    Cpuct,
+    discount,
+    maxtime,
+    temperature,
+    batch_size,
+    l2_coeff,
+)
+
+    data = BatchData(initialize_state_data(env))
+    collect_batch_data!(
+        data,
+        env,
+        policy,
+        Cpuct,
+        discount,
+        maxtime,
+        temperature,
+        batch_size,
+    )
+
+    state = batch_state(state_data(data))
+    target_probs, target_vals = batch_target(data, discount)
+
+    weights = params(policy)
+    l = 0.0
+    grads = Flux.gradient(weights) do
+        l = loss(policy, state, target_probs, target_vals, l2_coeff)
+    end
+
+    Flux.update!(optimizer, weights, grads)
+    return l
+end
+
+function train!(
+    policy,
+    env,
+    optimizer,
+    Cpuct,
+    discount,
+    maxtime,
+    temperature,
+    batch_size,
+    l2_coeff,
+    num_epochs,
+)
+
+    
 end
 
 # end module
