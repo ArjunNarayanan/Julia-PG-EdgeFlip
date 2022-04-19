@@ -11,7 +11,7 @@ action_probabilities_and_value(policy, state) = nothing
 reward(env) = nothing
 update!(state_data, env) = nothing
 
-struct Node
+mutable struct Node
     parent::Union{Nothing,Node}
     action::Int # integer action that brings me to this state from parent
     reward::Float64 # normalized reward for transitioning into this state
@@ -20,6 +20,7 @@ struct Node
     total_action_values::Dict{Int,Float64}
     mean_action_values::Dict{Int,Float64}
     prior_probabilities::Vector{Float64}
+    value::Float64
     terminal::Bool
 end
 
@@ -33,6 +34,10 @@ end
 
 function parent(n::Node)
     return n.parent
+end
+
+function set_parent!(n::Node, p)
+    n.parent = p
 end
 
 function children(n::Node)
@@ -65,6 +70,10 @@ end
 
 function prior_probabilities(n::Node)
     return n.prior_probabilities
+end
+
+function value(n::Node)
+    return n.value
 end
 
 function number_of_actions(n::Node)
@@ -101,7 +110,7 @@ function Base.show(io::IO, n::Node)
     println(io, "\t$nc children")
 end
 
-function Node(parent, action, reward, prior_probabilities, terminal)
+function Node(parent, action, reward, prior_probabilities, value, terminal)
 
     children = Dict{Int,Node}()
     visit_count = Dict{Int,Int}()
@@ -117,6 +126,7 @@ function Node(parent, action, reward, prior_probabilities, terminal)
         total_action_values,
         mean_action_values,
         prior_probabilities,
+        value,
         terminal,
     )
 
@@ -128,13 +138,14 @@ function Node(parent, action, reward, prior_probabilities, terminal)
 end
 
 # constructor to make root node
-function Node(prior_probabilities, terminal)
+function Node(prior_probabilities, value, terminal)
 
     return Node(
         nothing,
         0,
         0.0,
         prior_probabilities,
+        value,
         terminal,
     )
 end
@@ -177,14 +188,18 @@ function select_action(n::Node, Cpuct)
     return idx
 end
 
-function select(n::Node, env, Cpuct)
-    action = select_action(n, Cpuct)
-    if has_child(n, action)
-        step!(env, action)
-        c = child(n, action)
-        select(c, env, Cpuct)
+function select(node::Node, env, Cpuct)
+    if is_terminal(node)
+        return node, 0
     else
-        return n, action
+        action = select_action(node, Cpuct)
+        if has_child(node, action)
+            step!(env, action)
+            c = child(node, action)
+            return select(c, env, Cpuct)
+        else
+            return node, action
+        end
     end
 end
 
@@ -193,8 +208,8 @@ function expand!(parent, action, env, policy)
     probs, val = action_probabilities_and_value(policy, state(env))
     terminal = is_terminal(env)
     r = reward(env)
-    child = Node(parent, action, r, probs, terminal)
-    return child, val
+    child = Node(parent, action, r, probs, val, terminal)
+    return child
 end
 
 function parent_value(reward, value, discount)
@@ -235,20 +250,22 @@ function move_to_root!(node, env)
 end
 
 function search!(root, env, policy, Cpuct, discount, maxtime)
+    if !is_terminal(root)
+        start_time = time()
+        elapsed = 0.0
 
-    terminal = is_terminal(root)
-    start_time = time()
-    elapsed = 0.0
-    
-    while !terminal && elapsed < maxtime
+        while elapsed < maxtime
+            node, action = select(root, env, Cpuct)
 
-        node, action = select(root, env, Cpuct)
+            if !is_terminal(node)
+                child = expand!(node, action, env, policy)
+                backup!(child, value(child), discount, env)
+            else
+                backup!(node, value(node), discount, env)
+            end
 
-        child, val = expand!(node, action, env, policy)
-        terminal = is_terminal(child)
-        backup!(child, val, discount, env)
-
-        elapsed = time() - start_time
+            elapsed = time() - start_time
+        end
     end
 end
 
@@ -277,6 +294,8 @@ function step_mcts!(batch_data, root, env, policy, Cpuct, discount, maxtime, tem
     t = is_terminal(c)
     
     update!(batch_data, s, action_probs, action, r, t)
+
+    set_parent!(c, nothing)
     
     return c
 end
@@ -285,11 +304,17 @@ function collect_sample_trajectory!(batch_data, env, policy, Cpuct, discount, ma
     reset!(env)
     p, v = action_probabilities_and_value(policy, state(env))
     terminal = is_terminal(env)
-    root = Node(p, terminal)
+    root = Node(p, v, terminal)
 
     while !terminal
         root = step_mcts!(batch_data, root, env, policy, Cpuct, discount, maxtime, temperature)
         terminal = is_terminal(root)
+    end
+end
+
+function collect_batch_data!(batch_data, env, policy, Cpuct, discount, maxtime, temperature, batch_size)
+    while length(batch_data) < batch_size
+        collect_sample_trajectory!(batch_data, env, policy, Cpuct, discount, maxtime, temperature)
     end
 end
 
@@ -302,10 +327,13 @@ function backup_state_value(rewards, terminal, discount)
     v = 0.0
 
     for idx = l:-1:1
-        v += (discount^counter)*rewards[idx]
+        if terminal[idx]
+            counter = 0
+            v = 0.0
+        end
+        v = rewards[idx] + discount*v
         values[idx] = v
-        error("Incomplete")
-        counter = terminal[idx] ? 0 : counter + 1 
+        counter += 1
     end
 
     return values

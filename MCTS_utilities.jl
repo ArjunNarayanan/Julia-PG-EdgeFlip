@@ -6,9 +6,8 @@ struct StateData
     edge_connectivity::Any
     edge_pairs::Any
     normalized_remaining_flips::Any
-    function StateData()
+    function StateData(edge_connectivity)
         edge_template_score = Vector{Matrix{Int}}(undef, 0)
-        edge_connectivity = Vector{Vector{Int}}(undef, 0)
         edge_pairs = Vector{Vector{Int}}(undef, 0)
         normalized_remaining_flips = Float64[]
         new(edge_template_score, edge_connectivity, edge_pairs, normalized_remaining_flips)
@@ -28,7 +27,6 @@ end
 function TS.update!(state_data::StateData, state)
     ets, econn, epairs, nflips = state
     push!(state_data.edge_template_score, ets)
-    push!(state_data.edge_connectivity, econn)
     push!(state_data.edge_pairs, epairs)
     push!(state_data.normalized_remaining_flips, nflips)
 end
@@ -62,7 +60,7 @@ function TS.reverse_step!(env::EdgeFlip.OrderedGameEnv, action)
     EdgeFlip.reverse_step!(env, triangle, vertex)
 end
 
-function TS.reset!(env::EdgeFlip.OrderedGameEnv; nflips = 1, maxflipfactor = 1.0)
+function TS.reset!(env::EdgeFlip.OrderedGameEnv; nflips = 10, maxflipfactor = 1.0)
     maxflips = ceil(Int, maxflipfactor * nflips)
     EdgeFlip.reset!(env, nflips = nflips, maxflips = maxflips)
 end
