@@ -278,7 +278,6 @@ function step_mcts!(batch_data, root, env, policy, Cpuct, discount, maxtime, tem
     
     update!(batch_data, s, action_probs, action, r, t)
     
-
     return c
 end
 
@@ -303,28 +302,14 @@ function backup_state_value(rewards, terminal, discount)
     v = 0.0
 
     for idx = l:-1:1
-        counter = terminal[idx] ? 0 : counter + 1 
         v += (discount^counter)*rewards[idx]
         values[idx] = v
+        error("Incomplete")
+        counter = terminal[idx] ? 0 : counter + 1 
     end
 
     return values
 end
-
-# fix this function!
-# function step_mcts!(batch_data, env, policy, Cpuct, discount, maxtime, temperature)
-    
-#     root = search(env, policy, Cpuct, discount, maxtime)
-#     na = number_of_actions(root)
-
-#     action_probs = mcts_action_probabilities(visit_count(root), na, temperature)
-#     action = rand(Categorical(action_probs))
-
-#     step!(env, action)
-#     r = reward(env)
-
-#     update!(batch_data, state(env), action_probs, r)
-# end
 
 struct BatchData
     state_data::Any

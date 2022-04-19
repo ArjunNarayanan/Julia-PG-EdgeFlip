@@ -52,9 +52,9 @@ function action_to_edgeix(action)
     return triangle, vertex
 end
 
-function TS.step!(env::EdgeFlip.OrderedGameEnv, action)
+function TS.step!(env::EdgeFlip.OrderedGameEnv, action; no_flip_reward = 0)
     triangle, vertex = action_to_edgeix(action)
-    EdgeFlip.step!(env, triangle, vertex, no_flip_reward = 0)
+    EdgeFlip.step!(env, triangle, vertex, no_flip_reward = no_flip_reward)
 end
 
 function TS.reverse_step!(env::EdgeFlip.OrderedGameEnv, action)
