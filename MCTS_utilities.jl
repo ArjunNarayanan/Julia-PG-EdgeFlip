@@ -1,6 +1,12 @@
+using EdgeFlip
 using Flux
+using Distributions: Categorical
+using Statistics
+using Printf
+
 include("MCTS.jl")
 TS = MCTS
+EF = EdgeFlip
 
 struct StateData
     edge_template_score::Any
@@ -115,4 +121,51 @@ end
 
 function TS.initialize_state_data(env)
     return StateData(env)
+end
+
+function single_trajectory_return(env, policy)
+    done = TS.is_terminal(env)
+    if done
+        return 0.0
+    else
+        initial_score = EF.score(env)
+        minscore = initial_score
+        while !done
+            probs, val = TS.action_probabilities_and_value(policy, TS.state(env))
+            action = rand(Categorical(probs))
+
+            TS.step!(env, action)
+
+            minscore = min(minscore, EF.score(env))
+            done = TS.is_terminal(env)
+        end
+        return initial_score - minscore
+    end
+end
+
+function single_trajectory_normalized_return(env, policy)
+    maxreturn = EF.score(env) - env.optimum_score
+    if maxreturn == 0
+        return 1.0
+    else
+        ret = single_trajectory_return(env, policy)
+        return ret / maxreturn
+    end
+end
+
+function average_normalized_returns(env, policy, num_trajectories)
+    ret = zeros(num_trajectories)
+    for idx = 1:num_trajectories
+        TS.reset!(env, nflips = env.num_initial_flips)
+        ret[idx] = single_trajectory_normalized_return(env, policy)
+    end
+    return mean(ret), std(ret)
+end
+
+function returns_versus_nflips(policy, nref, nflips, num_trajectories; maxflipfactor = 1.0)
+    maxflips = ceil(Int, maxflipfactor * nflips)
+    env = EdgeFlip.OrderedGameEnv(nref, nflips, maxflips = maxflips)
+    avg, dev = average_normalized_returns(env, policy, num_trajectories)
+    @printf "NFLIPS = %d \t MAXFLIPS = %d \t AVG RET = %1.3f\t STD DEV = %1.3f\n" env.num_initial_flips env.maxflips avg dev
+    return avg
 end

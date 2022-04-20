@@ -496,9 +496,10 @@ function train!(
     batch_size,
     l2_coeff,
     num_epochs,
+    evaluator
 )
 
-    
+
 end
 
 # end module

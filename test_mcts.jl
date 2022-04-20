@@ -1,6 +1,3 @@
-using EdgeFlip
-using Distributions: Categorical
-
 include("MCTS_utilities.jl")
 include("policy_and_value_network.jl")
 
@@ -11,6 +8,8 @@ nref = 1
 env = EdgeFlip.OrderedGameEnv(nref, 0)
 policy = PV.PVNet(3, 16)
 
+returns_versus_nflips(policy, 1, 10, 500)
+
 Cpuct = 1.0
 temperature = 1.0
 l2_coeff = 1e-2
@@ -19,7 +18,6 @@ maxtime = 1e-2
 batch_size = 50
 
 optimizer = ADAM(0.01)
-
 TS.step_epoch!(policy, env, optimizer, Cpuct, discount, maxtime, temperature, batch_size, l2_coeff)
 
 # data = TS.BatchData(StateData(env))
