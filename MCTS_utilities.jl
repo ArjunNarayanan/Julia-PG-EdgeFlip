@@ -88,7 +88,7 @@ function TS.reverse_step!(env::EdgeFlip.OrderedGameEnv, action)
     EdgeFlip.reverse_step!(env, triangle, vertex)
 end
 
-function TS.reset!(env::EdgeFlip.OrderedGameEnv; nflips = 10, maxflipfactor = 1.0)
+function TS.reset!(env::EdgeFlip.OrderedGameEnv; nflips = env.num_initial_flips, maxflipfactor = 1.0)
     maxflips = ceil(Int, maxflipfactor * nflips)
     EdgeFlip.reset!(env, nflips = nflips, maxflips = maxflips)
 end

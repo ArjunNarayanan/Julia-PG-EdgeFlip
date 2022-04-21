@@ -2,6 +2,7 @@ module MCTS
 
 using Flux
 using Distributions: Categorical
+using Printf
 
 # methods that need to be overloaded
 state(env) = nothing
@@ -148,11 +149,6 @@ function Node(prior_probabilities, value, terminal)
 end
 
 function PUCT_exploration(prior_probs, visit_count, Cpuct)
-    u = Cpuct * prior_probs * sqrt(sum(visit_count)) ./ (1 .+ visit_count)
-    return u
-end
-
-function PUCT_exploration(prior_probs, visit_count, Cpuct)
 
     u = Cpuct * prior_probs * sqrt(sum(values(visit_count)))
     for (action, visit) in visit_count
@@ -267,13 +263,32 @@ function search!(root, env, policy, Cpuct, discount, maxtime)
 end
 
 function mcts_action_probabilities(visit_count, number_of_actions, temperature)
-    action_probabilities = zeros(number_of_actions)
+    vs = zeros(number_of_actions)
     for (key, value) in visit_count
-        action_probabilities[key] = value
+        vs[key] = value
     end
-    action_probabilities .^= (1.0 / temperature)
-    action_probabilities ./= sum(action_probabilities)
-    return action_probabilities
+    ap = softmax(vs / temperature)
+    return ap
+end
+
+function get_new_root(old_root, action, env, policy)
+    if has_child(old_root, action)
+        return child(old_root, action)
+    else
+        p, v = action_probabilities_and_value(policy, state(env))
+        new_root = Node(p, v, is_terminal(env))
+        return new_root
+    end
+end
+
+function tree_action_probabilities(policy, env, Cpuct, discount, maxtime, temperature)
+    p, v = action_probabilities_and_value(policy, state(env))
+    root = Node(p,v,is_terminal(env))
+    search!(root, env, policy, Cpuct, discount, maxtime)
+    na = number_of_actions(root)
+
+    action_probs = mcts_action_probabilities(visit_count(root), na, temperature)
+    return action_probs
 end
 
 function step_mcts!(batch_data, root, env, policy, Cpuct, discount, maxtime, temperature)
@@ -287,7 +302,7 @@ function step_mcts!(batch_data, root, env, policy, Cpuct, discount, maxtime, tem
 
     step!(env, action)
     r = reward(env)
-    c = child(root, action)
+    c = get_new_root(root, action, env, policy)
     t = is_terminal(c)
 
     update!(batch_data, s, action_probs, action, r, t)
@@ -413,39 +428,32 @@ function batch_target(b::BatchData, discount)
     return action_probabilities, state_values
 end
 
-function evaluate_loss(
-    policy_logprobs,
-    policy_vals,
-    target_probs,
-    target_vals,
-    weights,
-    l2_coeff,
-)
+function loss_components(policy_logprobs, policy_vals, target_probs, target_vals, weights)
+
     @assert size(policy_logprobs) == size(target_probs)
     @assert length(policy_vals) == length(target_vals)
 
     p1 = Flux.mean(-vec(sum(target_probs .* (policy_logprobs), dims = 1)))
     p2 = Flux.mean(abs2, (policy_vals - target_vals))
-
     sqnorm(w) = sum(abs2, w)
-    p3 = l2_coeff * sum(sqnorm, weights)
+    p3 = sum(sqnorm, weights)
 
-    l = p1 + p2 + p3
-    return l
+    return p1, p2, p3
 end
 
-function loss(policy, state, target_probabilities, target_values, l2_coeff)
+function loss(policy, state, target_probabilities, target_values)
     policy_logprobs, policy_vals = batch_action_logprobs_and_values(policy, state)
     weights = params(policy)
-    l = evaluate_loss(
+
+    p1, p2, p3 = loss_components(
         policy_logprobs,
         policy_vals,
         target_probabilities,
         target_values,
         weights,
-        l2_coeff,
     )
-    return l
+
+    return p1, p2, p3
 end
 
 function step_epoch!(
@@ -476,10 +484,13 @@ function step_epoch!(
     target_probs, target_vals = batch_target(data, discount)
 
     weights = params(policy)
-    l = 0.0
+    cross_entropy = mse = reg = l = 0.0
     grads = Flux.gradient(weights) do
-        l = loss(policy, state, target_probs, target_vals, l2_coeff)
+        cross_entropy, mse, reg = loss(policy, state, target_probs, target_vals)
+        l = cross_entropy + mse + l2_coeff * reg
     end
+    @printf "\tCE : %1.4f\tMSE : %1.4f\tREG : %1.4f\n" cross_entropy mse l2_coeff * reg
+    @printf "TOTAL : %1.4f\n" l
 
     Flux.update!(optimizer, weights, grads)
     return l
@@ -496,10 +507,30 @@ function train!(
     batch_size,
     l2_coeff,
     num_epochs,
-    evaluator
+    evaluator;
+    evaluate_every = 50,
 )
 
+    ret = evaluator(policy)
 
+    for epoch = 1:num_epochs
+        l = step_epoch!(
+            policy,
+            env,
+            optimizer,
+            Cpuct,
+            discount,
+            maxtime,
+            temperature,
+            batch_size,
+            l2_coeff,
+        )
+
+        @printf "epoch : %5d \t loss : %1.4f\n" epoch l
+        if epoch % evaluate_every == 0
+            new_rets = evaluator(policy)
+        end
+    end
 end
 
 # end module
