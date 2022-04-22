@@ -9,9 +9,11 @@ state(env) = nothing
 step!(env, action) = nothing
 reverse_step!(env, action) = nothing
 reset!(env) = nothing
+is_terminal(env) = nothing
+reward(env) = nothing
+
 action_probabilities_and_value(policy, state) = nothing
 batch_action_logprobs_and_values(policy, state) = nothing
-reward(env) = nothing
 update!(state_data, env) = nothing
 initialize_state_data(env) = nothing
 batch_state(state_data) = nothing
@@ -85,9 +87,9 @@ function number_of_actions(n::Node)
     return length(prior_probabilities(n))
 end
 
-function is_terminal(n::Node)
-    return n.terminal
-end
+# function is_terminal(n::Node)
+#     return n.terminal
+# end
 
 function mean_action_values(n::Node)
     return n.mean_action_values
@@ -181,15 +183,15 @@ function select_action(n::Node, Cpuct)
     return idx
 end
 
-function select(node::Node, env, Cpuct)
-    if is_terminal(node)
+function select!(node::Node, env, Cpuct)
+    if is_terminal(env)
         return node, 0
     else
         action = select_action(node, Cpuct)
         if has_child(node, action)
             step!(env, action)
             c = child(node, action)
-            return select(c, env, Cpuct)
+            return select!(c, env, Cpuct)
         else
             return node, action
         end
@@ -243,14 +245,14 @@ function move_to_root!(node, env)
 end
 
 function search!(root, env, policy, Cpuct, discount, maxtime)
-    if !is_terminal(root)
+    if !is_terminal(env)
         start_time = time()
         elapsed = 0.0
 
         while elapsed < maxtime
-            node, action = select(root, env, Cpuct)
+            node, action = select!(root, env, Cpuct)
 
-            if !is_terminal(node)
+            if !is_terminal(env)
                 child = expand!(node, action, env, policy)
                 backup!(child, value(child), discount, env)
             else
@@ -303,7 +305,7 @@ function step_mcts!(batch_data, root, env, policy, Cpuct, discount, maxtime, tem
     step!(env, action)
     r = reward(env)
     c = get_new_root(root, action, env, policy)
-    t = is_terminal(c)
+    t = is_terminal(env)
 
     update!(batch_data, s, action_probs, action, r, t)
 
@@ -329,7 +331,7 @@ function collect_sample_trajectory!(
     while !terminal
         root =
             step_mcts!(batch_data, root, env, policy, Cpuct, discount, maxtime, temperature)
-        terminal = is_terminal(root)
+        terminal = is_terminal(env)
     end
 end
 
@@ -511,7 +513,7 @@ function train!(
     evaluate_every = 50,
 )
 
-    ret = evaluator(policy)
+    ret = evaluator(policy, env)
 
     for epoch = 1:num_epochs
         l = step_epoch!(
@@ -528,7 +530,7 @@ function train!(
 
         @printf "epoch : %5d \t loss : %1.4f\n" epoch l
         if epoch % evaluate_every == 0
-            new_rets = evaluator(policy)
+            new_rets = evaluator(policy, env)
         end
     end
 end

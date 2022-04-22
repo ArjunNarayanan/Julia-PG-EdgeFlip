@@ -1,44 +1,42 @@
 include("MCTS_utilities.jl")
 include("policy_and_value_network.jl")
+using MeshPlotter
 
-function evaluate_model(policy; num_trajectories = 500)
-    nref = 0
-    nflips = 1
-    ret = returns_versus_nflips(policy, nref, nflips, num_trajectories)
+function evaluate_model(policy, env; num_trajectories = 500)
+    ret = returns_versus_nflips(policy, env, num_trajectories)
     return ret
 end
 
+
 TS = MCTS
 PV = PolicyAndValueNetwork
+MP = MeshPlotter
 
-Cpuct = 1.0
-temperature = 1e0
+Cpuct = 1
+temperature = 25
 l2_coeff = 1e-3
 discount = 1.0
-maxtime = 1e-2
+maxtime = 1e-1
 batch_size = 50
-num_epochs = 100
+num_epochs = 50
 
 
-# nref = 0
-# nflips = 1
-# env = EdgeFlip.OrderedGameEnv(nref, nflips)
+# nref = 1
+# nflips = 10
+# env = EdgeFlip.OrderedGameEnv(nref, nflips, maxflips = nflips)
 # policy = PV.PVNet(3, 16)
-# na = EdgeFlip.number_of_actions(env)
+# na = TS.number_of_actions(root)
 
-TS.reset!(env, nflips = 1)
+# TS.reset!(env)
+# total_score = env.score
+
 # p, v = TS.action_probabilities_and_value(policy, TS.state(env))
-# root = TS.Node(p,v,TS.is_terminal(env))
+# root = TS.Node(p, v, TS.is_terminal(env))
 # TS.search!(root, env, policy, Cpuct, discount, maxtime)
-# ap = TS.mcts_action_probabilities(root.visit_count, 18, 1e2)
+# ap = TS.mcts_action_probabilities(root.visit_count, na, temperature)
+# action = rand(Categorical(ap))
+# TS.step!(env, action)
+# env.reward
 
-optimizer = ADAM(0.002)
+optimizer = ADAM(2e-3)
 TS.train!(policy, env, optimizer, Cpuct, discount, maxtime, temperature, batch_size, l2_coeff, num_epochs, evaluate_model)
-
-# TS.step_epoch!(policy, env, optimizer, Cpuct, discount, maxtime, temperature, batch_size, l2_coeff)
-
-# TS.reset!(env, nflips = 1)
-# p, v = TS.action_probabilities_and_value(policy, TS.state(env))
-# root = TS.Node(p,v,TS.is_terminal(env))
-# root = TS.step_mcts!(data, root, env, policy, Cpuct, discount, maxtime, temperature)
-# terminal = TS.is_terminal(root)

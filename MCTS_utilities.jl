@@ -27,16 +27,16 @@ function Base.length(s::StateData)
 end
 
 function offset_edge_pairs!(epairs)
-    na,nb = size(epairs)
-    for (idx,col) in enumerate(eachcol(epairs))
-        col .+= (idx-1)*na
+    na, nb = size(epairs)
+    for (idx, col) in enumerate(eachcol(epairs))
+        col .+= (idx - 1) * na
     end
 end
 
 function TS.batch_state(s::StateData)
     ets = cat(s.edge_template_score..., dims = 3)
     econn = s.edge_connectivity
-    
+
     epairs = cat(s.edge_pairs..., dims = 2)
     offset_edge_pairs!(epairs)
     epairs = vec(epairs)
@@ -79,6 +79,9 @@ function action_to_edgeix(action)
 end
 
 function TS.step!(env::EdgeFlip.OrderedGameEnv, action; no_flip_reward = 0)
+    na = EdgeFlip.number_of_actions(env)
+    @assert 0 < action <= na "Expected 0 < action <= $na got action = $action"
+    @assert !EdgeFlip.done(env) "Attempting to step in done environment"
     triangle, vertex = action_to_edgeix(action)
     EdgeFlip.step!(env, triangle, vertex, no_flip_reward = no_flip_reward)
 end
@@ -88,7 +91,11 @@ function TS.reverse_step!(env::EdgeFlip.OrderedGameEnv, action)
     EdgeFlip.reverse_step!(env, triangle, vertex)
 end
 
-function TS.reset!(env::EdgeFlip.OrderedGameEnv; nflips = env.num_initial_flips, maxflipfactor = 1.0)
+function TS.reset!(
+    env::EdgeFlip.OrderedGameEnv;
+    nflips = env.num_initial_flips,
+    maxflipfactor = 1.0,
+)
     maxflips = ceil(Int, maxflipfactor * nflips)
     EdgeFlip.reset!(env, nflips = nflips, maxflips = maxflips)
 end
@@ -162,10 +169,101 @@ function average_normalized_returns(env, policy, num_trajectories)
     return mean(ret), std(ret)
 end
 
-function returns_versus_nflips(policy, nref, nflips, num_trajectories; maxflipfactor = 1.0)
+function returns_versus_nflips(policy, env, num_trajectories; maxflipfactor = 1.0)
+    avg, dev = average_normalized_returns(env, policy, num_trajectories)
+    @printf "NFLIPS = %d \t MAXFLIPS = %d \t AVG RET = %1.3f\t STD DEV = %1.3f\n" env.num_initial_flips env.maxflips avg dev
+    return avg
+end
+
+function single_trajectory_tree_return(env, policy, Cpuct, discount, maxtime, temperature)
+    done = TS.is_terminal(env)
+    if done
+        return 0.0
+    else
+        initial_score = EF.score(env)
+        minscore = initial_score
+        while !done
+            probs = TS.tree_action_probabilities(
+                policy,
+                env,
+                Cpuct,
+                discount,
+                maxtime,
+                temperature,
+            )
+            action = rand(Categorical(probs))
+
+            TS.step!(env, action)
+
+            minscore = min(minscore, EF.score(env))
+            done = TS.is_terminal(env)
+        end
+        return initial_score - minscore
+    end
+end
+
+function single_trajectory_normalized_tree_return(
+    env,
+    policy,
+    Cpuct,
+    discount,
+    maxtime,
+    temperature,
+)
+    maxreturn = EF.score(env) - env.optimum_score
+    if maxreturn == 0
+        return 1.0
+    else
+        ret = single_trajectory_tree_return(
+            env,
+            policy,
+            Cpuct,
+            discount,
+            maxtime,
+            temperature,
+        )
+        return ret / maxreturn
+    end
+end
+
+function average_normalized_tree_returns(
+    env,
+    policy,
+    Cpuct,
+    discount,
+    maxtime,
+    temperature,
+    num_trajectories,
+)
+    ret = zeros(num_trajectories)
+    for idx = 1:num_trajectories
+        TS.reset!(env, nflips = env.num_initial_flips)
+        ret[idx] = single_trajectory_normalized_tree_return(
+            env,
+            policy,
+            Cpuct,
+            discount,
+            maxtime,
+            temperature,
+        )
+    end
+    return mean(ret), std(ret)
+end
+
+function tree_returns_versus_nflips(
+    policy,
+    Cpuct,
+    discount,
+    maxtime,
+    temperature,
+    nref,
+    nflips,
+    num_trajectories;
+    maxflipfactor = 1.0,
+)
     maxflips = ceil(Int, maxflipfactor * nflips)
     env = EdgeFlip.OrderedGameEnv(nref, nflips, maxflips = maxflips)
-    avg, dev = average_normalized_returns(env, policy, num_trajectories)
+    avg, dev = average_normalized_tree_returns(env, policy, Cpuct, discount, maxtime, temperature, num_trajectories)
     @printf "NFLIPS = %d \t MAXFLIPS = %d \t AVG RET = %1.3f\t STD DEV = %1.3f\n" env.num_initial_flips env.maxflips avg dev
     return avg
 end
