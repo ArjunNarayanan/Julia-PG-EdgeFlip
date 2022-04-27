@@ -24,7 +24,7 @@ num_epochs = 200
 
 # using BSON
 # BSON.@save "results/models/MCTS/3L.bson" policy
-# BSON.@load "results/models/MCTS/3L.bson" policy
+BSON.@load "results/models/MCTS/3L.bson" policy
 
 
 # data = TS.BatchData(TS.initialize_state_data(env))
@@ -35,14 +35,15 @@ num_epochs = 200
 # TS.train!(policy, env, optimizer, data, discount, batch_size, l2_coeff, num_epochs, evaluate_model)
 # evaluate_model(policy, env)
 
-Cpuct = 0.1
-temperature = 1
-maxtime = 0.1
-
-TS.reset!(env)
 p, v = TS.action_probabilities_and_value(policy, TS.state(env))
-root = TS.Node(p,v,TS.is_terminal(env))
-TS.search!(root, env, policy, Cpuct, discount, maxtime)
-ap = TS.mcts_action_probabilities(root.visit_count, 72, temperature)
 
-tree_returns_versus_nflips(policy, Cpuct, discount, maxtime, temperature, 1, 10, 10)
+root = TS.Node(p, v, TS.is_terminal(env))
+tree_exploration_factor = 0.5
+probability_weight = 1
+maxiter = 1000
+
+TS.search!(root, env, policy, tree_exploration_factor, probability_weight, discount, maxiter)
+# root
+# ap = TS.mcts_action_probabilities(root.visit_count, 72, temperature)
+
+# tree_returns_versus_nflips(policy, Cpuct, discount, maxtime, temperature, 1, 10, 10)

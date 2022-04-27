@@ -121,8 +121,10 @@ end
 
 function Node(parent, action, reward, prior_probabilities, value, terminal)
 
+    num_actions = length(prior_probabilities)
+
     children = Dict{Int,Node}()
-    visit_count = Dict{Int,Int}()
+    visit_count = Dict{Int,Int}(zip(1:num_actions, ones(Int,num_actions)))
     total_action_values = Dict{Int,Float64}()
     mean_action_values = Dict{Int,Float64}()
 
@@ -152,48 +154,114 @@ function Node(prior_probabilities, value, terminal)
     return Node(nothing, 0, 0.0, prior_probabilities, value, terminal)
 end
 
-function PUCT_exploration(prior_probs, visit_count, Cpuct)
+# function PUCT_exploration(prior_probs, visit_count, Cpuct)
 
-    u = Cpuct * prior_probs * sqrt(sum(values(visit_count)))
+#     u = Cpuct * prior_probs * sqrt(sum(values(visit_count)))
+#     for (action, visit) in visit_count
+#         u[action] /= (1 + visit)
+#     end
+#     return u
+# end
+
+# function PUCT_score(prior_probs, visit_count, action_values, Cpuct)
+#     score = PUCT_exploration(prior_probs, visit_count, Cpuct)
+#     for (action, value) in action_values
+#         score[action] += value
+#     end
+#     return score
+# end
+
+# function select_action_index(prior_probs, visit_count, action_values, Cpuct)
+#     s = PUCT_score(prior_probs, visit_count, action_values, Cpuct)
+#     idx = rand(findall(s .== maximum(s)))
+#     return idx
+# end
+
+# function select_action(n::Node, Cpuct)
+#     idx = select_action_index(
+#         prior_probabilities(n),
+#         visit_count(n),
+#         mean_action_values(n),
+#         Cpuct,
+#     )
+#     return idx
+# end
+
+# function select!(node::Node, env, Cpuct)
+#     if is_terminal(env)
+#         return node, 0
+#     else
+#         action = select_action(node, Cpuct)
+#         if has_child(node, action)
+#             step!(env, action)
+#             c = child(node, action)
+#             return select!(c, env, Cpuct)
+#         else
+#             return node, action
+#         end
+#     end
+# end
+
+function tree_policy_score(
+    visit_count,
+    action_values,
+    prior_probabilities,
+    tree_exploration_factor,
+    probability_weight,
+)
+
+    score = probability_weight * prior_probabilities
+    log_total_visit_count = log(sum(values(visit_count)))
+
     for (action, visit) in visit_count
-        u[action] /= (1 + visit)
+        score[action] /= (1 + visit)
+        score[action] += tree_exploration_factor * sqrt(log_total_visit_count / visit)
     end
-    return u
-end
 
-function PUCT_score(prior_probs, visit_count, action_values, Cpuct)
-    score = PUCT_exploration(prior_probs, visit_count, Cpuct)
     for (action, value) in action_values
         score[action] += value
     end
+
     return score
 end
 
-function select_action_index(prior_probs, visit_count, action_values, Cpuct)
-    s = PUCT_score(prior_probs, visit_count, action_values, Cpuct)
-    idx = rand(findall(s .== maximum(s)))
-    return idx
+function select_action_index(
+    visit_count,
+    action_values,
+    prior_probabilities,
+    tree_exploration_factor,
+    probability_weight,
+)
+    score = tree_policy_score(
+        visit_count,
+        action_values,
+        prior_probabilities,
+        tree_exploration_factor,
+        probability_weight,
+    )
+    return rand(findall(score .== maximum(score)))
 end
 
-function select_action(n::Node, Cpuct)
+function select_action(n::Node, tree_exploration_factor, probability_weight)
     idx = select_action_index(
-        prior_probabilities(n),
         visit_count(n),
         mean_action_values(n),
-        Cpuct,
+        prior_probabilities(n),
+        tree_exploration_factor,
+        probability_weight,
     )
     return idx
 end
 
-function select!(node::Node, env, Cpuct)
+function select!(node::Node, env, tree_exploration_factor, probability_weight)
     if is_terminal(env)
         return node, 0
     else
-        action = select_action(node, Cpuct)
+        action = select_action(node, tree_exploration_factor, probability_weight)
         if has_child(node, action)
             step!(env, action)
             c = child(node, action)
-            return select!(c, env, Cpuct)
+            return select!(c, env, tree_exploration_factor, probability_weight)
         else
             return node, action
         end
@@ -237,13 +305,20 @@ function backup!(node, value, discount, env)
     end
 end
 
-function search!(root, env, policy, Cpuct, discount, maxtime)
+function search!(
+    root,
+    env,
+    policy,
+    tree_exploration_factor,
+    probability_weight,
+    discount,
+    maxiter,
+)
     if !is_terminal(env)
-        start_time = time()
-        elapsed = 0.0
+        counter = 0
 
-        while elapsed < maxtime
-            node, action = select!(root, env, Cpuct)
+        while counter < maxiter
+            node, action = select!(root, env, tree_exploration_factor, probability_weight)
 
             if !is_terminal(env)
                 child = expand!(node, action, env, policy)
@@ -253,7 +328,7 @@ function search!(root, env, policy, Cpuct, discount, maxtime)
                 backup!(node, v, discount, env)
             end
 
-            elapsed = time() - start_time
+            counter += 1
         end
     end
 end
@@ -279,17 +354,41 @@ function get_new_root(old_root, action, env, policy)
     end
 end
 
-function tree_action_probabilities(policy, env, Cpuct, discount, maxtime, temperature)
+function tree_action_probabilities(
+    policy,
+    env,
+    tree_exploration_factor,
+    probability_weight,
+    discount,
+    maxtime,
+    temperature,
+)
     p, v = action_probabilities_and_value(policy, state(env))
     root = Node(p, v, is_terminal(env))
-    search!(root, env, policy, Cpuct, discount, maxtime)
+    search!(
+        root,
+        env,
+        policy,
+        tree_exploration_factor,
+        probability_weight,
+        discount,
+        maxtime,
+    )
     na = number_of_actions(root)
 
     action_probs = mcts_action_probabilities(visit_count(root), na, temperature)
     return action_probs
 end
 
-function tree_action_probabilities!(root, policy, env, Cpuct, discount, maxtime, temperature)
+function tree_action_probabilities!(
+    root,
+    policy,
+    env,
+    Cpuct,
+    discount,
+    maxtime,
+    temperature,
+)
     search!(root, env, policy, Cpuct, discount, maxtime)
     na = number_of_actions(root)
 
@@ -523,15 +622,7 @@ function train!(
     target_probs, target_vals = batch_target(batch_data, discount)
 
     for epoch = 1:num_epochs
-        step_epoch!(
-            policy,
-            optimizer,
-            sd,
-            target_probs,
-            target_vals,
-            batch_size,
-            l2_coeff,
-        )
+        step_epoch!(policy, optimizer, sd, target_probs, target_vals, batch_size, l2_coeff)
 
         if epoch % evaluate_every == 0
             new_rets = evaluator(policy, env)
