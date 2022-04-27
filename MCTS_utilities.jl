@@ -13,13 +13,14 @@ struct StateData
     edge_connectivity::Any
     edge_pairs::Any
     normalized_remaining_flips::Any
-    function StateData(env)
-        edge_connectivity = EdgeFlip.edge_connectivity(env)
-        edge_template_score = Vector{Matrix{Int}}(undef, 0)
-        edge_pairs = Vector{Vector{Int}}(undef, 0)
-        normalized_remaining_flips = Float64[]
-        new(edge_template_score, edge_connectivity, edge_pairs, normalized_remaining_flips)
-    end
+end
+
+function StateData(env)
+    edge_connectivity = EdgeFlip.edge_connectivity(env)
+    edge_template_score = Vector{Matrix{Int}}(undef, 0)
+    edge_pairs = Vector{Vector{Int}}(undef, 0)
+    normalized_remaining_flips = Float64[]
+    StateData(edge_template_score, edge_connectivity, edge_pairs, normalized_remaining_flips)
 end
 
 function Base.length(s::StateData)
@@ -57,6 +58,29 @@ function TS.update!(state_data::StateData, state)
     push!(state_data.edge_template_score, ets)
     push!(state_data.edge_pairs, epairs)
     push!(state_data.normalized_remaining_flips, nflips)
+end
+
+function TS.reorder(state_data::StateData, idx)
+    @assert length(idx) == length(state_data)
+    ets = state_data.edge_template_score[idx]
+    epairs = state_data.edge_pairs[idx]
+    remflips = state_data.normalized_remaining_flips[idx]
+    sd = StateData(ets, state_data.edge_connectivity, epairs, remflips)
+    return sd
+end
+
+function Base.getindex(state_data::StateData, start_stop)
+    
+    ets = cat(state_data.edge_template_score[start_stop]..., dims = 3)
+    econn = state_data.edge_connectivity
+    
+    epairs = cat(state_data.edge_pairs[start_stop]..., dims = 2)
+    offset_edge_pairs!(epairs)
+    epairs = vec(epairs)
+
+    nflips = state_data.normalized_remaining_flips[start_stop]
+
+    return ets, econn, epairs, nflips
 end
 
 function TS.state(env::EdgeFlip.OrderedGameEnv)
@@ -105,7 +129,15 @@ function TS.is_terminal(env::EdgeFlip.OrderedGameEnv)
 end
 
 function TS.reward(env)
-    EdgeFlip.normalized_reward(env)
+    if TS.is_terminal(env)
+        r =
+            (EdgeFlip.initial_score(env) - EdgeFlip.score(env)) /
+            (EdgeFlip.initial_score(env) - EdgeFlip.optimum_score(env))
+        return r
+    else
+        return 0.0
+    end
+    # EdgeFlip.normalized_reward(env)
 end
 
 function TS.action_probabilities_and_value(policy, state)
@@ -182,8 +214,13 @@ function single_trajectory_tree_return(env, policy, Cpuct, discount, maxtime, te
     else
         initial_score = EF.score(env)
         minscore = initial_score
+
+        p, v = TS.action_probabilities_and_value(policy, TS.state(env))
+        root = TS.Node(p, v, TS.is_terminal(env))
+
         while !done
-            probs = TS.tree_action_probabilities(
+            probs = TS.tree_action_probabilities!(
+                root,
                 policy,
                 env,
                 Cpuct,
@@ -191,9 +228,11 @@ function single_trajectory_tree_return(env, policy, Cpuct, discount, maxtime, te
                 maxtime,
                 temperature,
             )
+
             action = rand(Categorical(probs))
 
             TS.step!(env, action)
+            root = TS.get_new_root(root, action, env, policy)
 
             minscore = min(minscore, EF.score(env))
             done = TS.is_terminal(env)
@@ -263,7 +302,15 @@ function tree_returns_versus_nflips(
 )
     maxflips = ceil(Int, maxflipfactor * nflips)
     env = EdgeFlip.OrderedGameEnv(nref, nflips, maxflips = maxflips)
-    avg, dev = average_normalized_tree_returns(env, policy, Cpuct, discount, maxtime, temperature, num_trajectories)
+    avg, dev = average_normalized_tree_returns(
+        env,
+        policy,
+        Cpuct,
+        discount,
+        maxtime,
+        temperature,
+        num_trajectories,
+    )
     @printf "NFLIPS = %d \t MAXFLIPS = %d \t AVG RET = %1.3f\t STD DEV = %1.3f\n" env.num_initial_flips env.maxflips avg dev
     return avg
 end
