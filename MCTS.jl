@@ -24,13 +24,12 @@ mutable struct Node
     parent::Union{Nothing,Node}
     action::Int # integer action that brings me to this state from parent
     reward::Float64 # normalized reward for transitioning into this state
-    children::Dict{Int,Node}
-    visit_count::Dict{Int,Int}
-    total_action_values::Dict{Int,Float64}
-    mean_action_values::Dict{Int,Float64}
+    children::Vector{Node}
+    visit_count::Vector{Int}
+    total_action_values::Vector{Float64}
+    mean_action_values::Vector{Float64}
     prior_probabilities::Vector{Float64}
     value::Float64
-    terminal::Bool
 end
 
 function num_children(n::Node)
@@ -65,12 +64,8 @@ function set_child!(parent, child, action)
     parent.mean_action_values[action] = 0.0
 end
 
-function has_children(n::Node)
-    return !isempty(children(n))
-end
-
 function has_child(n::Node, action)
-    return haskey(children(n), action)
+    return isassigned(children(n), action)
 end
 
 function has_parent(n::Node)
@@ -88,10 +83,6 @@ end
 function number_of_actions(n::Node)
     return length(prior_probabilities(n))
 end
-
-# function is_terminal(n::Node)
-#     return n.terminal
-# end
 
 function mean_action_values(n::Node)
     return n.mean_action_values
@@ -116,17 +107,18 @@ end
 function Base.show(io::IO, n::Node)
     nc = num_children(n)
     println(io, "Node")
-    println(io, "\t$nc children")
+    s = @sprintf "\tvalue = %1.3f" n.value
+    println(io, s)
 end
 
-function Node(parent, action, reward, prior_probabilities, value, terminal)
+function Node(parent, action, reward, prior_probabilities, value)
 
     num_actions = length(prior_probabilities)
 
-    children = Dict{Int,Node}()
-    visit_count = Dict{Int,Int}(zip(1:num_actions, ones(Int, num_actions)))
-    total_action_values = Dict{Int,Float64}()
-    mean_action_values = Dict{Int,Float64}()
+    children = Vector{Node}(undef, num_actions)
+    visit_count = zeros(Int, num_actions)
+    total_action_values = zeros(num_actions)
+    mean_action_values = zeros(num_actions)
 
     child = Node(
         parent,
@@ -138,7 +130,6 @@ function Node(parent, action, reward, prior_probabilities, value, terminal)
         mean_action_values,
         prior_probabilities,
         value,
-        terminal,
     )
 
     if !isnothing(parent)
@@ -149,78 +140,68 @@ function Node(parent, action, reward, prior_probabilities, value, terminal)
 end
 
 # constructor to make root node
-function Node(prior_probabilities, value, terminal)
+function Node(prior_probabilities::Vector{Float64}, value::Float64)
 
-    return Node(nothing, 0, 0.0, prior_probabilities, value, terminal)
+    return Node(nothing, 0, 0.0, prior_probabilities, value)
 end
 
-# function PUCT_exploration(prior_probs, visit_count, Cpuct)
+function Node(env, policy)
+    p, v = action_probabilities_and_value(policy, state(env))
+    return Node(p, v)
+end
+##################################################################################################################################
 
-#     u = Cpuct * prior_probs * sqrt(sum(values(visit_count)))
-#     for (action, visit) in visit_count
-#         u[action] /= (1 + visit)
-#     end
-#     return u
-# end
 
-# function PUCT_score(prior_probs, visit_count, action_values, Cpuct)
-#     score = PUCT_exploration(prior_probs, visit_count, Cpuct)
-#     for (action, value) in action_values
-#         score[action] += value
-#     end
-#     return score
-# end
 
-# function select_action_index(prior_probs, visit_count, action_values, Cpuct)
-#     s = PUCT_score(prior_probs, visit_count, action_values, Cpuct)
-#     idx = rand(findall(s .== maximum(s)))
-#     return idx
-# end
 
-# function select_action(n::Node, Cpuct)
-#     idx = select_action_index(
-#         prior_probabilities(n),
-#         visit_count(n),
-#         mean_action_values(n),
-#         Cpuct,
-#     )
-#     return idx
-# end
+##################################################################################################################################
+struct TreeSettings
+    probability_weight::Any
+    exploration_factor::Any
+    maximum_iterations
+    temperature
+    discount
+end
 
-# function select!(node::Node, env, Cpuct)
-#     if is_terminal(env)
-#         return node, 0
-#     else
-#         action = select_action(node, Cpuct)
-#         if has_child(node, action)
-#             step!(env, action)
-#             c = child(node, action)
-#             return select!(c, env, Cpuct)
-#         else
-#             return node, action
-#         end
-#     end
-# end
+function exploration_factor(settings::TreeSettings)
+    return settings.exploration_factor
+end
 
-function tree_policy_score(
-    visit_count,
-    action_values,
-    prior_probabilities,
-    tree_exploration_factor,
-    probability_weight,
-)
+function probability_weight(settings::TreeSettings)
+    return settings.probability_weight
+end
 
-    score = probability_weight * prior_probabilities
-    log_total_visit_count = log(sum(values(visit_count)))
+function maximum_iterations(settings::TreeSettings)
+    return settings.maximum_iterations
+end
 
-    for (action, visit) in visit_count
-        score[action] /= (1 + visit)
-        score[action] += tree_exploration_factor * sqrt(log_total_visit_count / visit)
-    end
+function temperature(settings::TreeSettings)
+    return settings.temperature
+end
 
-    for (action, value) in action_values
-        score[action] += value
-    end
+function discount(settings::TreeSettings)
+    return settings.discount
+end
+
+function tree_policy_score(visit_count, action_values, prior_probabilities, settings)
+
+    total_visits = sum(visit_count)
+    score = exploration_factor(settings)*sqrt(total_visits)*(prior_probabilities ./ (1 .+ visit_count))
+    score .+= action_values
+    # num_actions = length(visit_count)
+    # @assert length(action_values) == length(prior_probabilities)
+
+    # total_visit_count = sum(visit_count)
+    # log_total_visit_count = log(total_visit_count)
+
+    # score = probability_weight(settings) * (prior_probabilities ./ (1 .+ visit_count))
+
+    # for action in 1:num_actions
+    #     visit = visit_count[action]
+    #     explore = visit == 0 ? Inf : exploration_factor(settings) * sqrt(log_total_visit_count/visit)
+    #     exploit = action_values[action]
+    #     score[action] += (explore + exploit)
+    # end
 
     return score
 end
@@ -229,39 +210,37 @@ function select_action_index(
     visit_count,
     action_values,
     prior_probabilities,
-    tree_exploration_factor,
-    probability_weight,
+    settings,
 )
     score = tree_policy_score(
         visit_count,
         action_values,
         prior_probabilities,
-        tree_exploration_factor,
-        probability_weight,
+        settings
     )
+
     return rand(findall(score .== maximum(score)))
 end
 
-function select_action(n::Node, tree_exploration_factor, probability_weight)
+function select_action(n::Node, settings)
     idx = select_action_index(
         visit_count(n),
         mean_action_values(n),
         prior_probabilities(n),
-        tree_exploration_factor,
-        probability_weight,
+        settings,
     )
     return idx
 end
 
-function select!(node::Node, env, tree_exploration_factor, probability_weight)
+function select!(node::Node, env, settings)
     if is_terminal(env)
         return node, 0
     else
-        action = select_action(node, tree_exploration_factor, probability_weight)
+        action = select_action(node, settings)
         if has_child(node, action)
             step!(env, action)
             c = child(node, action)
-            return select!(c, env, tree_exploration_factor, probability_weight)
+            return select!(c, env, settings)
         else
             return node, action
         end
@@ -271,16 +250,11 @@ end
 function expand!(parent, action, env, policy)
     step!(env, action)
     probs, val = action_probabilities_and_value(policy, state(env))
-    terminal = is_terminal(env)
     r = reward(env)
-    child = Node(parent, action, r, probs, val, terminal)
+    child = Node(parent, action, r, probs, val)
     return child
 end
 
-function parent_value(reward, value, discount)
-    return discount * value
-    # return reward + discount * value * (1 - reward)
-end
 
 function backup!(node, value, discount, env)
     if has_parent(node)
@@ -290,12 +264,11 @@ function backup!(node, value, discount, env)
         Q = mean_action_values(p)
         N = visit_count(p)
         a = action(node)
-        r = reward(node)
 
-        update = parent_value(r, value, discount)
+        N[a] += 1
+        update = discount * value
         W[a] += update
         Q[a] = W[a] / N[a]
-        N[a] += 1
 
         reverse_step!(env, a)
 
@@ -309,23 +282,20 @@ function search!(
     root,
     env,
     policy,
-    tree_exploration_factor,
-    probability_weight,
-    discount,
-    maxiter,
+    tree_settings
 )
     if !is_terminal(env)
         counter = 0
 
-        while counter < maxiter
-            node, action = select!(root, env, tree_exploration_factor, probability_weight)
+        while counter < maximum_iterations(tree_settings)
+            node, action = select!(root, env, tree_settings)
 
             if !is_terminal(env)
                 child = expand!(node, action, env, policy)
-                backup!(child, value(child), discount, env)
+                backup!(child, value(child), discount(tree_settings), env)
             else
                 v = reward(env)
-                backup!(node, v, discount, env)
+                backup!(node, v, discount(tree_settings), env)
             end
 
             counter += 1
@@ -333,12 +303,8 @@ function search!(
     end
 end
 
-function mcts_action_probabilities(visit_count, number_of_actions, temperature)
-    vs = zeros(number_of_actions)
-    for (key, value) in visit_count
-        vs[key] = value
-    end
-    ap = softmax(vs / temperature)
+function mcts_action_probabilities(visit_count, temperature)
+    ap = softmax(visit_count/temperature)
     return ap
 end
 
@@ -349,59 +315,24 @@ function get_new_root(old_root, action, env, policy)
         return c
     else
         p, v = action_probabilities_and_value(policy, state(env))
-        new_root = Node(p, v, is_terminal(env))
+        new_root = Node(p, v)
         return new_root
     end
 end
-
-# function tree_action_probabilities(
-#     policy,
-#     env,
-#     tree_exploration_factor,
-#     probability_weight,
-#     discount,
-#     maxtime,
-#     temperature,
-# )
-#     p, v = action_probabilities_and_value(policy, state(env))
-#     root = Node(p, v, is_terminal(env))
-#     search!(
-#         root,
-#         env,
-#         policy,
-#         tree_exploration_factor,
-#         probability_weight,
-#         discount,
-#         maxtime,
-#     )
-#     na = number_of_actions(root)
-
-#     action_probs = mcts_action_probabilities(visit_count(root), na, temperature)
-#     return action_probs
-# end
 
 function tree_action_probabilities!(
     root,
     policy,
     env,
-    tree_exploration_factor,
-    probability_weight,
-    discount,
-    maxiter,
-    temperature,
+    tree_settings
 )
     search!(
         root,
         env,
         policy,
-        tree_exploration_factor,
-        probability_weight,
-        discount,
-        maxiter,
+        tree_settings
     )
-    na = number_of_actions(root)
-
-    ap = mcts_action_probabilities(visit_count(root), na, temperature)
+    ap = mcts_action_probabilities(visit_count(root), temperature(tree_settings))
     return ap
 end
 
@@ -410,11 +341,7 @@ function step_mcts!(
     root,
     env,
     policy,
-    tree_exploration_factor,
-    probability_weight,
-    discount,
-    maxiter,
-    temperature,
+    tree_settings
 )
     s = state(env)
 
@@ -422,14 +349,10 @@ function step_mcts!(
         root,
         env,
         policy,
-        tree_exploration_factor,
-        probability_weight,
-        discount,
-        maxiter,
+        tree_settings
     )
-    na = number_of_actions(root)
 
-    action_probs = mcts_action_probabilities(visit_count(root), na, temperature)
+    action_probs = mcts_action_probabilities(visit_count(root), temperature(tree_settings))
     action = rand(Categorical(action_probs))
 
     step!(env, action)
@@ -446,16 +369,11 @@ function collect_sample_trajectory!(
     batch_data,
     env,
     policy,
-    tree_exploration_factor,
-    probability_weight,
-    discount,
-    maxiter,
-    temperature,
+    tree_settings
 )
     reset!(env)
-    p, v = action_probabilities_and_value(policy, state(env))
+    root = Node(env, policy)
     terminal = is_terminal(env)
-    root = Node(p, v, terminal)
 
     while !terminal
         root = step_mcts!(
@@ -463,11 +381,7 @@ function collect_sample_trajectory!(
             root,
             env,
             policy,
-            tree_exploration_factor,
-            probability_weight,
-            discount,
-            maxiter,
-            temperature,
+            tree_settings
         )
         terminal = is_terminal(env)
     end
@@ -477,11 +391,7 @@ function collect_batch_data!(
     batch_data,
     env,
     policy,
-    tree_exploration_factor,
-    probability_weight,
-    discount,
-    maxiter,
-    temperature,
+    tree_settings,
     batch_size,
 )
     while length(batch_data) < batch_size
@@ -489,11 +399,7 @@ function collect_batch_data!(
             batch_data,
             env,
             policy,
-            tree_exploration_factor,
-            probability_weight,
-            discount,
-            maxiter,
-            temperature,
+            tree_settings
         )
     end
 end
