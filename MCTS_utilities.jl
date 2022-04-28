@@ -20,7 +20,12 @@ function StateData(env)
     edge_template_score = Vector{Matrix{Int}}(undef, 0)
     edge_pairs = Vector{Vector{Int}}(undef, 0)
     normalized_remaining_flips = Float64[]
-    StateData(edge_template_score, edge_connectivity, edge_pairs, normalized_remaining_flips)
+    StateData(
+        edge_template_score,
+        edge_connectivity,
+        edge_pairs,
+        normalized_remaining_flips,
+    )
 end
 
 function Base.length(s::StateData)
@@ -70,10 +75,10 @@ function TS.reorder(state_data::StateData, idx)
 end
 
 function Base.getindex(state_data::StateData, start_stop)
-    
+
     ets = cat(state_data.edge_template_score[start_stop]..., dims = 3)
     econn = state_data.edge_connectivity
-    
+
     epairs = cat(state_data.edge_pairs[start_stop]..., dims = 2)
     offset_edge_pairs!(epairs)
     epairs = vec(epairs)
@@ -207,7 +212,15 @@ function returns_versus_nflips(policy, env, num_trajectories; maxflipfactor = 1.
     return avg
 end
 
-function single_trajectory_tree_return(env, policy, Cpuct, discount, maxtime, temperature)
+function single_trajectory_tree_return(
+    env,
+    policy,
+    tree_exploration_factor,
+    probability_weight,
+    discount,
+    maxiter,
+    temperature,
+)
     done = TS.is_terminal(env)
     if done
         return 0.0
@@ -223,9 +236,10 @@ function single_trajectory_tree_return(env, policy, Cpuct, discount, maxtime, te
                 root,
                 policy,
                 env,
-                Cpuct,
+                tree_exploration_factor,
+                probability_weight,
                 discount,
-                maxtime,
+                maxiter,
                 temperature,
             )
 
@@ -244,9 +258,10 @@ end
 function single_trajectory_normalized_tree_return(
     env,
     policy,
-    Cpuct,
+    tree_exploration_factor,
+    probability_weight,
     discount,
-    maxtime,
+    maxiter,
     temperature,
 )
     maxreturn = EF.score(env) - env.optimum_score
@@ -256,9 +271,10 @@ function single_trajectory_normalized_tree_return(
         ret = single_trajectory_tree_return(
             env,
             policy,
-            Cpuct,
+            tree_exploration_factor,
+            probability_weight,
             discount,
-            maxtime,
+            maxiter,
             temperature,
         )
         return ret / maxreturn
@@ -268,9 +284,10 @@ end
 function average_normalized_tree_returns(
     env,
     policy,
-    Cpuct,
+    tree_exploration_factor,
+    probability_weight,
     discount,
-    maxtime,
+    maxiter,
     temperature,
     num_trajectories,
 )
@@ -280,9 +297,10 @@ function average_normalized_tree_returns(
         ret[idx] = single_trajectory_normalized_tree_return(
             env,
             policy,
-            Cpuct,
+            tree_exploration_factor,
+            probability_weight,
             discount,
-            maxtime,
+            maxiter,
             temperature,
         )
     end

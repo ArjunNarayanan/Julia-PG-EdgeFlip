@@ -124,7 +124,7 @@ function Node(parent, action, reward, prior_probabilities, value, terminal)
     num_actions = length(prior_probabilities)
 
     children = Dict{Int,Node}()
-    visit_count = Dict{Int,Int}(zip(1:num_actions, ones(Int,num_actions)))
+    visit_count = Dict{Int,Int}(zip(1:num_actions, ones(Int, num_actions)))
     total_action_values = Dict{Int,Float64}()
     mean_action_values = Dict{Int,Float64}()
 
@@ -292,10 +292,10 @@ function backup!(node, value, discount, env)
         a = action(node)
         r = reward(node)
 
-        N[a] += 1
         update = parent_value(r, value, discount)
         W[a] += update
         Q[a] = W[a] / N[a]
+        N[a] += 1
 
         reverse_step!(env, a)
 
@@ -354,17 +354,42 @@ function get_new_root(old_root, action, env, policy)
     end
 end
 
-function tree_action_probabilities(
+# function tree_action_probabilities(
+#     policy,
+#     env,
+#     tree_exploration_factor,
+#     probability_weight,
+#     discount,
+#     maxtime,
+#     temperature,
+# )
+#     p, v = action_probabilities_and_value(policy, state(env))
+#     root = Node(p, v, is_terminal(env))
+#     search!(
+#         root,
+#         env,
+#         policy,
+#         tree_exploration_factor,
+#         probability_weight,
+#         discount,
+#         maxtime,
+#     )
+#     na = number_of_actions(root)
+
+#     action_probs = mcts_action_probabilities(visit_count(root), na, temperature)
+#     return action_probs
+# end
+
+function tree_action_probabilities!(
+    root,
     policy,
     env,
     tree_exploration_factor,
     probability_weight,
     discount,
-    maxtime,
+    maxiter,
     temperature,
 )
-    p, v = action_probabilities_and_value(policy, state(env))
-    root = Node(p, v, is_terminal(env))
     search!(
         root,
         env,
@@ -372,34 +397,36 @@ function tree_action_probabilities(
         tree_exploration_factor,
         probability_weight,
         discount,
-        maxtime,
+        maxiter,
     )
-    na = number_of_actions(root)
-
-    action_probs = mcts_action_probabilities(visit_count(root), na, temperature)
-    return action_probs
-end
-
-function tree_action_probabilities!(
-    root,
-    policy,
-    env,
-    Cpuct,
-    discount,
-    maxtime,
-    temperature,
-)
-    search!(root, env, policy, Cpuct, discount, maxtime)
     na = number_of_actions(root)
 
     ap = mcts_action_probabilities(visit_count(root), na, temperature)
     return ap
 end
 
-function step_mcts!(batch_data, root, env, policy, Cpuct, discount, maxtime, temperature)
+function step_mcts!(
+    batch_data,
+    root,
+    env,
+    policy,
+    tree_exploration_factor,
+    probability_weight,
+    discount,
+    maxiter,
+    temperature,
+)
     s = state(env)
 
-    search!(root, env, policy, Cpuct, discount, maxtime)
+    search!(
+        root,
+        env,
+        policy,
+        tree_exploration_factor,
+        probability_weight,
+        discount,
+        maxiter,
+    )
     na = number_of_actions(root)
 
     action_probs = mcts_action_probabilities(visit_count(root), na, temperature)
@@ -419,9 +446,10 @@ function collect_sample_trajectory!(
     batch_data,
     env,
     policy,
-    Cpuct,
+    tree_exploration_factor,
+    probability_weight,
     discount,
-    maxtime,
+    maxiter,
     temperature,
 )
     reset!(env)
@@ -430,8 +458,17 @@ function collect_sample_trajectory!(
     root = Node(p, v, terminal)
 
     while !terminal
-        root =
-            step_mcts!(batch_data, root, env, policy, Cpuct, discount, maxtime, temperature)
+        root = step_mcts!(
+            batch_data,
+            root,
+            env,
+            policy,
+            tree_exploration_factor,
+            probability_weight,
+            discount,
+            maxiter,
+            temperature,
+        )
         terminal = is_terminal(env)
     end
 end
@@ -440,9 +477,10 @@ function collect_batch_data!(
     batch_data,
     env,
     policy,
-    Cpuct,
+    tree_exploration_factor,
+    probability_weight,
     discount,
-    maxtime,
+    maxiter,
     temperature,
     batch_size,
 )
@@ -451,9 +489,10 @@ function collect_batch_data!(
             batch_data,
             env,
             policy,
-            Cpuct,
+            tree_exploration_factor,
+            probability_weight,
             discount,
-            maxtime,
+            maxiter,
             temperature,
         )
     end
