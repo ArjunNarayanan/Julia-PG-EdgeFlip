@@ -80,10 +80,6 @@ function value(n::Node)
     return n.value
 end
 
-function number_of_actions(n::Node)
-    return length(prior_probabilities(n))
-end
-
 function mean_action_values(n::Node)
     return n.mean_action_values
 end
@@ -105,7 +101,6 @@ function reward(n::Node)
 end
 
 function Base.show(io::IO, n::Node)
-    nc = num_children(n)
     println(io, "Node")
     s = @sprintf "\tvalue = %1.3f" n.value
     println(io, s)
@@ -158,9 +153,9 @@ end
 struct TreeSettings
     probability_weight::Any
     exploration_factor::Any
-    maximum_iterations
-    temperature
-    discount
+    maximum_iterations::Any
+    temperature::Any
+    discount::Any
 end
 
 function exploration_factor(settings::TreeSettings)
@@ -186,7 +181,10 @@ end
 function tree_policy_score(visit_count, action_values, prior_probabilities, settings)
 
     total_visits = sum(visit_count)
-    score = exploration_factor(settings)*sqrt(total_visits)*(prior_probabilities ./ (1 .+ visit_count))
+    score =
+        exploration_factor(settings) *
+        sqrt(total_visits) *
+        (prior_probabilities ./ (1 .+ visit_count))
     score .+= action_values
     # num_actions = length(visit_count)
     # @assert length(action_values) == length(prior_probabilities)
@@ -206,18 +204,8 @@ function tree_policy_score(visit_count, action_values, prior_probabilities, sett
     return score
 end
 
-function select_action_index(
-    visit_count,
-    action_values,
-    prior_probabilities,
-    settings,
-)
-    score = tree_policy_score(
-        visit_count,
-        action_values,
-        prior_probabilities,
-        settings
-    )
+function select_action_index(visit_count, action_values, prior_probabilities, settings)
+    score = tree_policy_score(visit_count, action_values, prior_probabilities, settings)
 
     return rand(findall(score .== maximum(score)))
 end
@@ -278,12 +266,7 @@ function backup!(node, value, discount, env)
     end
 end
 
-function search!(
-    root,
-    env,
-    policy,
-    tree_settings
-)
+function search!(root, env, policy, tree_settings)
     if !is_terminal(env)
         counter = 0
 
@@ -304,7 +287,7 @@ function search!(
 end
 
 function mcts_action_probabilities(visit_count, temperature)
-    ap = softmax(visit_count/temperature)
+    ap = softmax(visit_count / temperature)
     return ap
 end
 
@@ -320,37 +303,16 @@ function get_new_root(old_root, action, env, policy)
     end
 end
 
-function tree_action_probabilities!(
-    root,
-    policy,
-    env,
-    tree_settings
-)
-    search!(
-        root,
-        env,
-        policy,
-        tree_settings
-    )
+function tree_action_probabilities!(root, policy, env, tree_settings)
+    search!(root, env, policy, tree_settings)
     ap = mcts_action_probabilities(visit_count(root), temperature(tree_settings))
     return ap
 end
 
-function step_mcts!(
-    batch_data,
-    root,
-    env,
-    policy,
-    tree_settings
-)
+function step_mcts!(batch_data, root, env, policy, tree_settings)
     s = state(env)
 
-    search!(
-        root,
-        env,
-        policy,
-        tree_settings
-    )
+    search!(root, env, policy, tree_settings)
 
     action_probs = mcts_action_probabilities(visit_count(root), temperature(tree_settings))
     action = rand(Categorical(action_probs))
@@ -365,42 +327,20 @@ function step_mcts!(
     return c
 end
 
-function collect_sample_trajectory!(
-    batch_data,
-    env,
-    policy,
-    tree_settings
-)
+function collect_sample_trajectory!(batch_data, env, policy, tree_settings)
     reset!(env)
     root = Node(env, policy)
     terminal = is_terminal(env)
 
     while !terminal
-        root = step_mcts!(
-            batch_data,
-            root,
-            env,
-            policy,
-            tree_settings
-        )
+        root = step_mcts!(batch_data, root, env, policy, tree_settings)
         terminal = is_terminal(env)
     end
 end
 
-function collect_batch_data!(
-    batch_data,
-    env,
-    policy,
-    tree_settings,
-    batch_size,
-)
-    while length(batch_data) < batch_size
-        collect_sample_trajectory!(
-            batch_data,
-            env,
-            policy,
-            tree_settings
-        )
+function collect_batch_data!(batch_data, env, policy, tree_settings, memory_size)
+    while length(batch_data) < memory_size
+        collect_sample_trajectory!(batch_data, env, policy, tree_settings)
     end
 end
 
@@ -512,10 +452,11 @@ function step_batch!(policy, optimizer, state, target_probs, target_vals, l2_coe
     ce = mse = reg = l = 0.0
     grads = Flux.gradient(weights) do
         ce, mse, reg = loss(policy, state, target_probs, target_vals)
-        l = ce + mse + l2_coeff * reg
+        reg = l2_coeff*reg
+        l = ce + mse + reg
     end
-    # @printf "\tCE : %1.4f\tMSE : %1.4f\tREG : %1.4f\tTOTAL : %1.4f\n" ce mse l2_coeff * reg l
     Flux.update!(optimizer, weights, grads)
+    return ce, mse, reg
 end
 
 function step_epoch!(
@@ -537,6 +478,10 @@ function step_epoch!(
     target_probs = target_probs[:, idx]
     target_vals = target_vals[idx]
 
+    cross_entropy = Float64[]
+    value_mse = Float64[]
+    weight_reg = Float64[]
+
     for start in range(1, step = batch_size, stop = memory_size)
         stop = min(start + batch_size - 1, memory_size)
 
@@ -544,8 +489,13 @@ function step_epoch!(
         tp = target_probs[:, start:stop]
         tv = target_vals[start:stop]
 
-        step_batch!(policy, optimizer, state, tp, tv, l2_coeff)
+        ce, mse, reg = step_batch!(policy, optimizer, state, tp, tv, l2_coeff)
+        push!(cross_entropy, ce)
+        push!(value_mse, mse)
+        push!(weight_reg, reg)
     end
+
+    return Flux.mean(cross_entropy), Flux.mean(value_mse), Flux.mean(weight_reg)
 end
 
 function train!(
@@ -559,6 +509,7 @@ function train!(
     num_epochs,
     evaluator;
     evaluate_every = 50,
+    print_every = 10
 )
 
     ret = evaluator(policy, env)
@@ -567,8 +518,19 @@ function train!(
     target_probs, target_vals = batch_target(batch_data, discount)
 
     for epoch = 1:num_epochs
-        step_epoch!(policy, optimizer, sd, target_probs, target_vals, batch_size, l2_coeff)
-
+        cross_entropy, value_mse, weight_reg = step_epoch!(
+            policy,
+            optimizer,
+            sd,
+            target_probs,
+            target_vals,
+            batch_size,
+            l2_coeff,
+        )
+        if epoch % print_every == 0
+            total = cross_entropy + value_mse + weight_reg
+            @printf "\tCE : %1.4f\tMSE : %1.4f\tREG : %1.4f\tTOTAL : %1.4f\n" cross_entropy value_mse weight_reg total
+        end
         if epoch % evaluate_every == 0
             new_rets = evaluator(policy, env)
         end
