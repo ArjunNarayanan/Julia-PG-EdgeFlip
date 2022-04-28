@@ -5,12 +5,13 @@ using Distributions: Categorical
 using Printf
 
 # methods that need to be overloaded
-state(env) = nothing
+# state(env) = nothing
 step!(env, action) = nothing
 reverse_step!(env, action) = nothing
 reset!(env) = nothing
 is_terminal(env) = nothing
 reward(env) = nothing
+estimate_value(env) = nothing
 
 mutable struct Node
     parent::Union{Nothing,Node}
@@ -115,8 +116,13 @@ function Node(parent, action, num_actions, value)
 end
 
 # Constructor to make root Node
-function Node(num_actions, value)
+function Node(num_actions::Int, value::Float64)
     return Node(nothing, 0, num_actions, value)
+end
+
+function Node(env, value)
+    num_actions = number_of_actions(env)
+    return Node(num_actions, value)
 end
 
 struct TreeSettings
@@ -128,10 +134,6 @@ end
 
 function exploration_factor(settings::TreeSettings)
     return settings.exploration_factor
-end
-
-function probability_weight(settings::TreeSettings)
-    return settings.probability_weight
 end
 
 function maximum_iterations(settings::TreeSettings)
@@ -152,11 +154,86 @@ function tree_policy_score(action_values, visit_count, settings)
 
     for (action, visit) in enumerate(visit_count)
         if visit == 0
-            score[visit] = Inf
+            score[action] = Inf
         else
-            score[visit] += sqrt(log_total_visits/visit)
+            score[action] += exploration_factor(settings)*sqrt(log_total_visits/visit)
         end
     end
 
     return score
+end
+
+
+function select_action_index(action_values, visit_count, settings)
+    score = tree_policy_score(action_values, visit_count, settings)
+    return rand(findall(score .== maximum(score)))
+end
+
+function select_action(n::Node, settings)
+    idx = select_action_index(
+        mean_action_values(n),
+        visit_count(n),
+        settings,
+    )
+    return idx
+end
+
+function select!(node::Node, env, settings)
+    if is_terminal(env)
+        return node, 0
+    else
+        action = select_action(node, settings)
+        if has_child(node, action)
+            step!(env, action)
+            c = child(node, action)
+            return select!(c, env, settings)
+        else
+            return node, action
+        end
+    end
+end
+
+function expand!(parent, action, env)
+    step!(env, action)
+    na = number_of_actions(env)
+    value = estimate_value(env)
+    child = Node(parent, action, na, value)
+    return child
+end
+
+function backup!(node, value, discount, env)
+    if has_parent(node)
+        p = parent(node)
+
+        W = total_action_values(p)
+        Q = mean_action_values(p)
+        N = visit_count(p)
+        a = action(node)
+        
+        N[a] += 1
+        update = discount*value
+        W[a] += update
+        Q[a] = W[a]/N[a]
+
+        reverse_step!(env, a)
+
+        backup!(p, update, discount, env)
+    end
+end
+
+function search!(root, env, tree_settings)
+    if !is_terminal(env)
+        for counter = 1:maximum_iterations(tree_settings)
+            node, action = select!(root, env, tree_settings)
+
+            if !is_terminal(env)
+                child = expand!(node, action, env)
+                backup!(child, value(child), discount(tree_settings), env)
+            else
+                backup!(node, value(node), discount(tree_settings), env)
+            end
+        end
+    end
+end
+
 end

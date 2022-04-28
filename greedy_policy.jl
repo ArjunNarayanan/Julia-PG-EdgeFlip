@@ -3,12 +3,13 @@ using EdgeFlip
 using Statistics
 
 function step!(env::EdgeFlip.GameEnv, action)
-    num_actions = EdgeFlip.number_of_actions(env)
-    if 0 < action <= num_actions
-        EdgeFlip.step!(env, action)
-    else
-        EdgeFlip.step!(env)
-    end
+    EdgeFlip.step!(env, action)
+    # num_actions = EdgeFlip.number_of_actions(env)
+    # if 0 < action <= num_actions
+    #     EdgeFlip.step!(env, action)
+    # else
+    #     EdgeFlip.step!(env)
+    # end
 end
 
 function step!(env::EdgeFlip.OrderedGameEnv, action)
