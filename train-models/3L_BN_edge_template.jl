@@ -19,8 +19,8 @@ end
 function returns_versus_nflips(nref, nflips, num_trajectories; maxstepfactor = 1.0)
     maxflips = ceil(Int, maxstepfactor * nflips)
     env = EdgeFlip.GameEnv(nref, nflips, maxflips = maxflips)
-    avg = GreedyPolicy.average_normalized_returns(env, num_trajectories)
-    @printf "NFLIPS = %d \t MAXFLIPS = %d \t RET = %1.3f\n" env.num_initial_flips env.maxflips avg
+    avg, dev = GreedyPolicy.average_normalized_returns(env, num_trajectories)
+    @printf "NFLIPS = %d \t MAXFLIPS = %d \t RET = %1.3f \t DEV = %1.3f\n" env.num_initial_flips env.maxflips avg dev
     return avg
 end
 
@@ -53,7 +53,7 @@ end
 #     EdgeFlip.reset!(env, nflips = nflips, maxflips = maxflips)
 # end
 
-function PG.reset!(env::EdgeFlip.OrderedGameEnv; nflips = 11, maxflipfactor = 1.0)
+function PG.reset!(env::EdgeFlip.OrderedGameEnv; nflips = 10, maxflipfactor = 1.0)
     maxflips = ceil(Int, maxflipfactor*nflips)
     EdgeFlip.reset!(env, nflips = nflips, maxflips = maxflips)
 end
@@ -65,7 +65,7 @@ end
 function evaluate_model(policy; num_trajectories = 500)
     nref = 1
     # nflip_range = 1:5:42
-    nflip_range = [11]
+    nflip_range = [10]
     ret = [returns_versus_nflips(policy, nref, nf, num_trajectories) for nf in nflip_range]
     return ret
 end
@@ -73,6 +73,7 @@ end
 nref = 1
 
 env = EdgeFlip.OrderedGameEnv(nref, 0)
+num_actions = EdgeFlip.number_of_actions(env)
 policy = PolicyNL(3, 16)
 
 # PG.reset!(env)

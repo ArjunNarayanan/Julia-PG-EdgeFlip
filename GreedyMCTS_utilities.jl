@@ -19,6 +19,10 @@ function GTS.reverse_step!(env, action)
     EF.reverse_step!(env, action)
 end
 
+function GTS.number_of_actions(env::EF.GameEnv)
+    return EF.number_of_actions(env)
+end
+
 function single_trajectory_greedy_returns_and_actions(env)
     initial_score = EF.score(env)
     done = GTS.is_terminal(env)
@@ -87,7 +91,7 @@ end
 function average_normalized_tree_returns(env, tree_settings, num_trajectories)
     ret = zeros(num_trajectories)
     for idx = 1:num_trajectories
-        EF.reset!(env, nflips = env.num_initial_flips, maxflips = env.num_initial_flips)
+        EF.reset!(env, nflips = env.num_initial_flips, maxflips = env.maxflips)
         ret[idx] = single_trajectory_normalized_tree_return(env, tree_settings)
     end
     return mean(ret), std(ret)
