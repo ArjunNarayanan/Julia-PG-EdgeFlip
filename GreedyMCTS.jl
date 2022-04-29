@@ -120,7 +120,8 @@ function Node(num_actions::Int, value::Float64)
     return Node(nothing, 0, num_actions, value)
 end
 
-function Node(env, value)
+function Node(env)
+    value = estimate_value(env)
     num_actions = number_of_actions(env)
     return Node(num_actions, value)
 end
@@ -234,6 +235,34 @@ function search!(root, env, tree_settings)
             end
         end
     end
+end
+
+function mcts_action_probabilities(visit_count, temperature)
+    return softmax(visit_count/temperature)
+end
+
+function get_new_root(old_root, action, env)
+    @assert has_child(old_root, action)
+    
+    c = child(old_root, action)
+    set_parent!(c, nothing)
+    return c
+end
+
+function tree_action_probabilities!(root, env, tree_settings)
+    search!(root, env, tree_settings)
+    ap = mcts_action_probabilities(visit_count(root), temperature(tree_settings))
+    return ap
+end
+
+function step_mcts!(root, env, tree_settings)
+    ap = tree_action_probabilities!(root, env, tree_settings)
+    action = rand(Categorical(ap))
+
+    step!(env, action)
+    child = get_new_root(root, action, env)
+
+    return child
 end
 
 end

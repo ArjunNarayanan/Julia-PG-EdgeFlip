@@ -1,18 +1,17 @@
 include("GreedyMCTS_utilities.jl")
 
-function GTS.number_of_actions(env::EdgeFlip.GameEnv)
-    return EdgeFlip.number_of_actions(env)
+function GTS.number_of_actions(env::EF.GameEnv)
+    return EF.number_of_actions(env)
 end
 
-env = EdgeFlip.GameEnv(1,10,maxflips=10)
+env = EF.GameEnv(1,10,maxflips=10)
 
-exploration_factor = 1
+exploration_factor = 0.05
 maxiter = 500
-temperature = 1
+temperature = 0.001
 discount = 1
 tree_settings = GTS.TreeSettings(exploration_factor, maxiter, temperature, discount)
 
-value = estimate_value(env)
-root = GTS.Node(env, value)
+mcts_ret, mcts_dev = average_normalized_tree_returns(env, tree_settings, 50)
 
-GTS.search!(root, env, tree_settings)
+# gd_ret, gd_dev = GP.average_normalized_returns(env, 500)

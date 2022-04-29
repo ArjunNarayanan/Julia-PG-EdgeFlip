@@ -67,20 +67,18 @@ end
 
 function single_trajectory_return(env)
     done = is_terminated(env)
-    if done
-        return 0.0
-    else
-        initial_score = score(env)
-        minscore = initial_score
-        while !done
-            action = greedy_action(env)
-            step!(env, action)
-            minscore = min(minscore, score(env))
-            done = is_terminated(env)
-        end
-        ret = initial_score - minscore
-        return ret
+    initial_score = score(env)
+    minscore = initial_score
+    
+    while !done
+        action = greedy_action(env)
+        step!(env, action)
+        minscore = min(minscore, score(env))
+        done = is_terminated(env)
     end
+
+    ret = initial_score - minscore
+    return ret
 end
 
 function single_trajectory_normalized_return(env)
@@ -102,18 +100,9 @@ function normalized_returns(env, num_trajectories)
     return ret
 end
 
-
-function average_returns(env, num_trajectories)
-    ret = zeros(num_trajectories)
-    for idx = 1:num_trajectories
-        reset!(env)
-        ret[idx] = single_trajectory_return(env)
-    end
-    return mean(ret)
-end
-
 function average_normalized_returns(env, num_trajectories)
-    return mean(normalized_returns(env, num_trajectories))
+    ret = normalized_returns(env, num_trajectories)
+    return mean(ret), std(ret)
 end
 
 end
