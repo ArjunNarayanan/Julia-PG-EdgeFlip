@@ -151,7 +151,6 @@ end
 
 ##################################################################################################################################
 struct TreeSettings
-    probability_weight::Any
     exploration_factor::Any
     maximum_iterations::Any
     temperature::Any
@@ -160,10 +159,6 @@ end
 
 function exploration_factor(settings::TreeSettings)
     return settings.exploration_factor
-end
-
-function probability_weight(settings::TreeSettings)
-    return settings.probability_weight
 end
 
 function maximum_iterations(settings::TreeSettings)
@@ -177,6 +172,7 @@ end
 function discount(settings::TreeSettings)
     return settings.discount
 end
+##################################################################################################################################
 
 function tree_policy_score(visit_count, action_values, prior_probabilities, settings)
 
@@ -186,20 +182,6 @@ function tree_policy_score(visit_count, action_values, prior_probabilities, sett
         sqrt(total_visits) *
         (prior_probabilities ./ (1 .+ visit_count))
     score .+= action_values
-    # num_actions = length(visit_count)
-    # @assert length(action_values) == length(prior_probabilities)
-
-    # total_visit_count = sum(visit_count)
-    # log_total_visit_count = log(total_visit_count)
-
-    # score = probability_weight(settings) * (prior_probabilities ./ (1 .+ visit_count))
-
-    # for action in 1:num_actions
-    #     visit = visit_count[action]
-    #     explore = visit == 0 ? Inf : exploration_factor(settings) * sqrt(log_total_visit_count/visit)
-    #     exploit = action_values[action]
-    #     score[action] += (explore + exploit)
-    # end
 
     return score
 end
@@ -447,6 +429,41 @@ function loss(policy, state, target_probabilities, target_values)
     return p1, p2, p3
 end
 
+##################################################################################################################################
+struct PolicyIterationSettings
+    discount
+    l2_coeff
+    memory_size
+    batch_size
+    num_epochs
+    num_iter
+end
+
+function l2_coefficient(settings::PolicyIterationSettings)
+    return settings.l2_coeff
+end
+
+function memory_size(settings::PolicyIterationSettings)
+    return settings.memory_size
+end
+
+function batch_size(settings::PolicyIterationSettings)
+    return settings.batch_size
+end
+
+function number_of_epochs(settings::PolicyIterationSettings)
+    return settings.num_epochs
+end
+
+function discount(settings::PolicyIterationSettings)
+    return settings.discount
+end
+
+function number_of_iterations(settings::PolicyIterationSettings)
+    return settings.num_iter
+end
+##################################################################################################################################
+
 function step_batch!(policy, optimizer, state, target_probs, target_vals, l2_coeff)
     weights = params(policy)
     ce = mse = reg = l = 0.0
@@ -500,41 +517,35 @@ end
 
 function train!(
     policy,
-    env,
     optimizer,
     batch_data,
-    discount,
-    batch_size,
-    l2_coeff,
-    num_epochs,
-    evaluator;
-    evaluate_every = 50,
+    settings;
     print_every = 10
 )
 
-    ret = evaluator(policy, env)
-
     sd = state_data(batch_data)
-    target_probs, target_vals = batch_target(batch_data, discount)
+    target_probs, target_vals = batch_target(batch_data, discount(settings))
 
-    for epoch = 1:num_epochs
+    for epoch = 1:number_of_epochs(setting)
         cross_entropy, value_mse, weight_reg = step_epoch!(
             policy,
             optimizer,
             sd,
             target_probs,
             target_vals,
-            batch_size,
-            l2_coeff,
+            batch_size(settings),
+            l2_coefficient(settings),
         )
         if epoch % print_every == 0
             total = cross_entropy + value_mse + weight_reg
             @printf "\tCE : %1.4f\tMSE : %1.4f\tREG : %1.4f\tTOTAL : %1.4f\n" cross_entropy value_mse weight_reg total
         end
-        if epoch % evaluate_every == 0
-            new_rets = evaluator(policy, env)
-        end
     end
+end
+
+function iterate!(policy, env, optimizer, evaluator, tree_settings, iter_settings; foldername)
+    best_policy = policy
+    old_ret = evaluator
 end
 
 # end module

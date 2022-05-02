@@ -1,12 +1,13 @@
 using Printf
 using Flux
 using EdgeFlip
-include("../edge_policy_gradient.jl")
-include("../NL_policy.jl")
-include("../greedy_policy.jl")
+include("edge_policy_gradient.jl")
+include("unaveraged_NL_policy.jl")
+include("greedy_policy.jl")
 # include("plot.jl")
 
 PG = EdgePolicyGradient
+
 
 function returns_versus_nflips(policy, nref, nflips, num_trajectories; maxstepfactor = 1.0)
     maxflips = ceil(Int, maxstepfactor * nflips)
@@ -48,11 +49,6 @@ function PG.reward(env::EdgeFlip.OrderedGameEnv)
     return EdgeFlip.reward(env)
 end
 
-# function PG.reset!(env::EdgeFlip.OrderedGameEnv; nflips = rand(1:42), maxflipfactor = 1.0)
-#     maxflips = ceil(Int, maxflipfactor*nflips)
-#     EdgeFlip.reset!(env, nflips = nflips, maxflips = maxflips)
-# end
-
 function PG.reset!(env::EdgeFlip.OrderedGameEnv; nflips = 10, maxflipfactor = 1.0)
     maxflips = ceil(Int, maxflipfactor*nflips)
     EdgeFlip.reset!(env, nflips = nflips, maxflips = maxflips)
@@ -64,7 +60,6 @@ end
 
 function evaluate_model(policy; num_trajectories = 500)
     nref = 1
-    # nflip_range = 1:5:42
     nflip_range = [10]
     ret = [returns_versus_nflips(policy, nref, nf, num_trajectories) for nf in nflip_range]
     return ret
@@ -74,7 +69,7 @@ nref = 1
 
 env = EdgeFlip.OrderedGameEnv(nref, 0)
 num_actions = EdgeFlip.number_of_actions(env)
-# policy = PolicyNL(3, 16)
+policy = PolicyNL(3, 16)
 
 # PG.reset!(env)
 # ep, econn, epairs = PG.state(env)
@@ -84,52 +79,27 @@ num_actions = EdgeFlip.number_of_actions(env)
 # v = eval_batch(policy.emodels[1], ep, econn, epairs)
 # l = PG.eval_batch(policy, bs[1], bs[2], bs[3])
 
-# num_trajectories = 500
-# nflip_range = 1:5:42
-# gd_ret = [returns_versus_nflips(nref, nf, num_trajectories) for nf in nflip_range]
-# normalized_nflips = nflip_range ./ num_actions
+num_trajectories = 500
+batch_size = 100
+num_epochs = 10000
+learning_rate = 1e-2
+decay = 0.7
+decay_step = 500
+clip = 5e-5
+discount = 0.8
 
-# num_trajectories = 500
-# batch_size = 100
-# num_epochs = 10000
-# learning_rate = 1e-2
-# decay = 0.7
-# decay_step = 500
-# clip = 5e-5
-# discount = 0.8
+optimizer =
+    Flux.Optimiser(ExpDecay(learning_rate, decay, decay_step, clip), ADAM(learning_rate))
+optimizer = ADAM(1e-5)
 
-# optimizer =
-#     Flux.Optimiser(ExpDecay(learning_rate, decay, decay_step, clip), ADAM(learning_rate))
-# # optimizer = ADAM(5e-6)
-
-# PG.train_and_save_best_models(
-#     env,
-#     policy,
-#     optimizer,
-#     batch_size,
-#     discount,
-#     num_epochs,
-#     evaluate_model,
-#     foldername = "results/models/3L-model/",
-#     generate_plots = false
-# )
-
-# using BSON: @load
-@load "results/models/3L-model/policy-5500.bson" policy new_rets
-println(new_rets)
-
-@time returns_versus_nflips(policy, 1, 10, 500)
-@time returns_versus_nflips(1, 10, 500)
-
-evaluate_model(policy)
-
-
-# # PG.run_training_loop(env, policy, optimizer, batch_size, discount, num_epochs)
-# # nn_ret = [returns_versus_nflips(policy, nref, nf, num_trajectories) for nf in nflip_range]
-# # plot_returns(normalized_nflips, nn_ret, gd_ret = gd_ret, ylim = [0.75, 1])
-
-# # filename = "results/new-edge-model/3L-res-performance.png"
-# # plot_returns(normalized_nflips, nn_ret, gd_ret = gd_ret, ylim = [0.75, 1], filename = filename)
-
-# # using BSON: @save
-# # @save "results/models/new-edge-model/3L.bson" policy
+PG.train_and_save_best_models(
+    env,
+    policy,
+    optimizer,
+    batch_size,
+    discount,
+    num_epochs,
+    evaluate_model,
+    foldername = "results/models/3L-unaveraged/",
+    generate_plots = false
+)

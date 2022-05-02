@@ -142,7 +142,6 @@ function TS.reward(env)
     else
         return 0.0
     end
-    # EdgeFlip.normalized_reward(env)
 end
 
 function TS.action_probabilities_and_value(policy, state)
