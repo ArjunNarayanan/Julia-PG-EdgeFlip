@@ -1,5 +1,6 @@
 module MCTS
 
+using BSON
 using Flux
 using Distributions: Categorical
 using Printf
@@ -437,6 +438,16 @@ struct PolicyIterationSettings
     batch_size
     num_epochs
     num_iter
+    threshold
+    num_samples
+end
+
+function number_of_samples(settings::PolicyIterationSettings)
+    return settings.num_samples
+end
+
+function threshold(settings::PolicyIterationSettings)
+    return settings.threshold
 end
 
 function l2_coefficient(settings::PolicyIterationSettings)
@@ -526,7 +537,7 @@ function train!(
     sd = state_data(batch_data)
     target_probs, target_vals = batch_target(batch_data, discount(settings))
 
-    for epoch = 1:number_of_epochs(setting)
+    for epoch = 1:number_of_epochs(settings)
         cross_entropy, value_mse, weight_reg = step_epoch!(
             policy,
             optimizer,
@@ -543,9 +554,31 @@ function train!(
     end
 end
 
-function iterate!(policy, env, optimizer, evaluator, tree_settings, iter_settings; foldername)
-    best_policy = policy
-    old_ret = evaluator
+function iterate!(policy, env, optimizer, evaluator, tree_settings, iter_settings; foldername = "")
+    best_policy = deepcopy(policy)
+
+    for iter in 1:number_of_iterations(iter_settings)
+        data = BatchData(initialize_state_data(env))
+        collect_batch_data!(data, env, best_policy, tree_settings, memory_size(iter_settings))
+
+        train!(policy, optimizer, data, iter_settings)
+
+        returns = evaluator(best_policy, policy, env, number_of_samples(iter_settings))
+
+        mean_ret = Flux.mean(returns[2,:])
+        @printf "\tMEAN RET = %1.4f\n" mean_ret
+
+        new_win_rate = count(returns[2,:] .>= returns[1,:])/number_of_samples(iter_settings)
+
+        if new_win_rate > threshold(iter_settings)
+            filename = foldername * "policy-"*string(iter)*".bson"
+            println("SAVING MODEL AT", filename)
+            BSON.@save filename policy mean_ret
+            best_policy = deepcopy(policy)
+        end
+    end
+
+    return best_policy
 end
 
 # end module

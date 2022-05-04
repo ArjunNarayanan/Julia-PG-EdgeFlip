@@ -8,7 +8,6 @@ using Printf
 # state(env) = nothing
 step!(env, action) = nothing
 reverse_step!(env, action) = nothing
-reset!(env) = nothing
 is_terminal(env) = nothing
 reward(env) = nothing
 estimate_value(env) = nothing
@@ -238,7 +237,9 @@ function search!(root, env, tree_settings)
 end
 
 function mcts_action_probabilities(visit_count, temperature)
-    return softmax(visit_count/temperature)
+    vs = Float64.(visit_count)
+    vs[vs .== 0.0] .= -Inf
+    return softmax(vs/temperature)
 end
 
 function get_new_root(old_root, action, env)

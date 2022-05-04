@@ -8,33 +8,23 @@ TS = MCTS
 PV = PolicyAndValueNetwork
 EF = EdgeFlip
 
-function evaluate_model(policy, env; num_trajectories = 500)
-    ret = returns_versus_nflips(policy, env, num_trajectories)
-    return ret
-end
-
-function keep_new_policy(old_policy, new_policy, env; num_samples = 500, threshold = 0.6)
-    returns = zeros(2,num_samples)
-    for sample in 1:num_samples
+function old_vs_new_policy(old_policy, new_policy, env, num_samples)
+    returns = zeros(2, num_samples)
+    for sample = 1:num_samples
         TS.reset!(env)
-        returns[1,sample] = single_trajectory_normalized_return(env, old_policy)
+        returns[1, sample] = single_trajectory_normalized_return(env, old_policy)
         EF.reset!(env, fixed = true)
-        returns[2,sample] = single_trajectory_normalized_return(env, new_policy)
+        returns[2, sample] = single_trajectory_normalized_return(env, new_policy)
     end
-
-    win_rate = count(returns[2,:] .> returns[1,:])/num_samples
-
-    return win_rate/num_samples
+    return returns
 end
 
-
-
-env = EdgeFlip.OrderedGameEnv(1,10,maxflips=10)
-policy = PV.PVNet(8,64)
+env = EdgeFlip.OrderedGameEnv(1, 10, maxflips = 10)
+# policy = PV.PVNet(8, 64)
 
 # using BSON
-# BSON.@save "results/models/MCTS/8L.bson" policy
-BSON.@load "results/models/MCTS/8L.bson" policy
+# BSON.@save "results/models/8L-MCTS/policy-1.bson" policy
+# BSON.@load "results/models/8L-MCTS/policy-1.bson" policy
 
 
 exploration_factor = 1.5
@@ -47,29 +37,36 @@ l2_coeff = 1e-3
 memory_size = 500
 num_epochs = 200
 batch_size = 50
-num_iter = 100
-iter_settings = TS.PolicyIterationSettings(discount, l2_coeff, memory_size, batch_size, num_epochs, num_iter)
+num_iter = 10
+threshold = 0.6
+num_samples = 500
 
-data = TS.BatchData(TS.initialize_state_data(env))
-TS.collect_batch_data!(data, env, policy, tree_settings, memory_size)
-target_probs, target_vals = TS.batch_target(data, discount);
-mean_vals = mean(target_vals)
+iter_settings = TS.PolicyIterationSettings(
+    discount,
+    l2_coeff,
+    memory_size,
+    batch_size,
+    num_epochs,
+    num_iter,
+    threshold,
+    num_samples,
+)
 
-# optimizer = ADAM(1e-2)
-# TS.train!(policy, env, optimizer, data, discount, batch_size, l2_coeff, num_epochs, evaluate_model)
+learning_rate = 1e-2
+decay = 0.7
+decay_step = 500
+clip = 5e-5
+optimizer =
+    Flux.Optimiser(ExpDecay(learning_rate, decay, decay_step, clip), ADAM(learning_rate))
 
-# evaluate_model(policy, env)
-win_rate = keep_new_policy(policy, policy, env)
+best_policy = TS.iterate!(
+    policy,
+    env,
+    optimizer,
+    old_vs_new_policy,
+    tree_settings,
+    iter_settings,
+    foldername = "results/models/8L-MCTS/",
+)
 
-# ret = average_normalized_tree_returns(
-#     env,
-#     policy,
-#     tree_exploration_factor,
-#     probability_weight,
-#     discount,
-#     maxiter,
-#     temperature,
-#     10,
-# )
-
-# tree_returns_versus_nflips(policy, Cpuct, discount, maxtime, temperature, 1, 10, 10)
+ret, dev = average_normalized_returns(env, best_policy, 500)
