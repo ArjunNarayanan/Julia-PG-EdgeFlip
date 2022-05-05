@@ -44,17 +44,25 @@ function PG.is_terminated(env::EdgeFlip.OrderedGameEnv)
     return EdgeFlip.is_terminated(env)
 end
 
+# function PG.reward(env::EdgeFlip.OrderedGameEnv)
+#     return EdgeFlip.reward(env)
+# end
+
 function PG.reward(env::EdgeFlip.OrderedGameEnv)
-    return EdgeFlip.reward(env)
+    r = 0
+    if PG.is_terminated(env) && (env.score == env.optimum_score)
+        r = 1
+    end
+    return r
 end
+
 
 # function PG.reset!(env::EdgeFlip.OrderedGameEnv; nflips = rand(1:42), maxflipfactor = 1.0)
 #     maxflips = ceil(Int, maxflipfactor*nflips)
 #     EdgeFlip.reset!(env, nflips = nflips, maxflips = maxflips)
 # end
 
-function PG.reset!(env::EdgeFlip.OrderedGameEnv; nflips = 10, maxflipfactor = 1.0)
-    maxflips = ceil(Int, maxflipfactor*nflips)
+function PG.reset!(env::EdgeFlip.OrderedGameEnv; nflips = env.nflips, maxflips = env.maxflips)
     EdgeFlip.reset!(env, nflips = nflips, maxflips = maxflips)
 end
 
@@ -72,9 +80,9 @@ end
 
 nref = 1
 
-env = EdgeFlip.OrderedGameEnv(nref, 0)
+env = EdgeFlip.OrderedGameEnv(nref, 10)
 num_actions = EdgeFlip.number_of_actions(env)
-# policy = PolicyNL(3, 16)
+policy = PolicyNL(3, 16)
 
 # PG.reset!(env)
 # ep, econn, epairs = PG.state(env)
@@ -89,18 +97,20 @@ num_actions = EdgeFlip.number_of_actions(env)
 # gd_ret = [returns_versus_nflips(nref, nf, num_trajectories) for nf in nflip_range]
 # normalized_nflips = nflip_range ./ num_actions
 
-# num_trajectories = 500
-# batch_size = 100
-# num_epochs = 10000
-# learning_rate = 1e-2
-# decay = 0.7
-# decay_step = 500
-# clip = 5e-5
-# discount = 0.8
+num_trajectories = 500
+batch_size = 100
+num_epochs = 10000
+learning_rate = 1e-2
+decay = 0.7
+decay_step = 500
+clip = 5e-5
+discount = 0.8
 
-# optimizer =
-#     Flux.Optimiser(ExpDecay(learning_rate, decay, decay_step, clip), ADAM(learning_rate))
+optimizer =
+    Flux.Optimiser(ExpDecay(learning_rate, decay, decay_step, clip), ADAM(learning_rate))
 # # optimizer = ADAM(5e-6)
+PG.run_training_loop(env, policy, optimizer, batch_size, discount, num_epochs)
+ret = returns_versus_nflips(policy, 1, 10, 500)
 
 # PG.train_and_save_best_models(
 #     env,
@@ -115,16 +125,15 @@ num_actions = EdgeFlip.number_of_actions(env)
 # )
 
 # using BSON: @load
-@load "results/models/3L-model/policy-5500.bson" policy new_rets
-println(new_rets)
+# @load "results/models/3L-model/policy-5500.bson" policy new_rets
+# println(new_rets)
 
-@time returns_versus_nflips(policy, 1, 10, 500)
-@time returns_versus_nflips(1, 10, 500)
+# @time returns_versus_nflips(policy, 1, 10, 500)
+# @time returns_versus_nflips(1, 10, 500)
 
-evaluate_model(policy)
+# evaluate_model(policy)
 
 
-# # PG.run_training_loop(env, policy, optimizer, batch_size, discount, num_epochs)
 # # nn_ret = [returns_versus_nflips(policy, nref, nf, num_trajectories) for nf in nflip_range]
 # # plot_returns(normalized_nflips, nn_ret, gd_ret = gd_ret, ylim = [0.75, 1])
 
