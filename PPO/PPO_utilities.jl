@@ -1,3 +1,5 @@
+using Flux
+using Distributions: Categorical
 using EdgeFlip
 include("PPO.jl")
 include("PPO_NL_policy.jl")
@@ -6,13 +8,9 @@ EF = EdgeFlip
 
 function PPO.state(env)
     ets = copy(EF.edge_template_score(env))
-    econn = copy(EF.edge_connectivity(env))
     epairs = copy(EF.edge_pairs(env))
-
-    idx = findall(epairs .== 0)
-    epairs[idx] .= idx
-
-    return ets, econn, epairs
+    
+    return ets, epairs
 end
 
 function PPO.is_terminal(env)
@@ -20,13 +18,7 @@ function PPO.is_terminal(env)
 end
 
 function PPO.reward(env)
-    if PPO.is_terminal(env)
-        r =
-            (EF.initial_score(env) - EF.score(env)) /
-            (EF.initial_score(env) - EF.optimum_score(env))
-    else
-        return 0.0
-    end
+    return EF.reward(env)
 end
 
 function PPO.reset!(env)
@@ -48,17 +40,14 @@ end
 
 struct StateData
     edge_template_score::Any
-    edge_connectivity::Any
     edge_pairs::Any
 end
 
 function StateData(env)
-    edge_connectivity = EdgeFlip.edge_connectivity(env)
-    edge_template_score = Vector{Matrix{Int}}(undef, 0)
-    edge_pairs = Vector{Vector{Int}}(undef, 0)
+    edge_template_score = Matrix{Int}[]
+    edge_pairs = Vector{Int}[]
     StateData(
         edge_template_score,
-        edge_connectivity,
         edge_pairs,
     )
 end
@@ -75,7 +64,7 @@ function Base.show(io::IO, s::StateData)
 end
 
 function PPO.update!(state_data::StateData, state)
-    ets, econn, epairs = state
+    ets, epairs = state
     push!(state_data.edge_template_score, ets)
     push!(state_data.edge_pairs, epairs)
 end
@@ -84,27 +73,37 @@ function PPO.initialize_state_data(env)
     return StateData(env)
 end
 
-function offset_edge_pairs!(epairs)
+function batch_offset_edge_pairs!(epairs)
     na, nb = size(epairs)
+    zero_index = findall(epairs .== 0)
+
     for (idx, col) in enumerate(eachcol(epairs))
         col .+= (idx - 1) * na
     end
+
+    epairs[zero_index] .= (na*nb + 1)
+end
+
+function offset_edge_pairs(epairs)
+    offset = length(epairs) + 1
+    offset_epairs = [p == 0 ? offset : p for p in epairs]
+    return offset_epairs
 end
 
 function PPO.batch_state(state_data)
     ets = cat(state_data.edge_template_score..., dims = 3)
-    econn = state_data.edge_connectivity
 
     epairs = cat(state_data.edge_pairs..., dims = 2)
-    offset_edge_pairs!(epairs)
+    batch_offset_edge_pairs!(epairs)
     epairs = vec(epairs)
 
-    return ets, econn, epairs
+    return ets, epairs
 end
 
 function PPO.action_probabilities(policy, state)
-    ets, econn, epairs = state
-    logits = Policy.eval_single(policy, ets, econn, epairs)
+    ets, epairs = state
+    epairs = offset_edge_pairs(epairs)
+    logits = Policy.eval_single(policy, ets, epairs)
 
     p = softmax(logits)
 
@@ -112,8 +111,8 @@ function PPO.action_probabilities(policy, state)
 end
 
 function PPO.batch_action_probabilities(policy, state)
-    ets, econn, epairs = state
-    logits = Policy.eval_batch(policy, ets, econn, epairs)
+    ets, epairs = state
+    logits = Policy.eval_batch(policy, ets, epairs)
 
     p = softmax(logits, dims = 1)
 

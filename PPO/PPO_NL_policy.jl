@@ -1,22 +1,24 @@
 module Policy
 
 using Flux
-include("../edge_model.jl")
+include("PPO_edge_model.jl")
 
 
 struct PolicyNL
-    emodels
+    emodels::Any
+    bvals::Any
     lmodel::Any
-    num_levels
-    num_hidden_channels
+    num_levels::Any
+    num_hidden_channels::Any
     function PolicyNL(num_levels, num_hidden_channels)
         emodels = [EdgeModel(4, num_hidden_channels)]
-        for i in 2:num_levels
+        for i = 2:num_levels
             push!(emodels, EdgeModel(num_hidden_channels, num_hidden_channels))
         end
 
+        bvals = Flux.glorot_uniform(num_hidden_channels)
         lmodel = Dense(num_hidden_channels, 1)
-        new(emodels, lmodel, num_levels, num_hidden_channels)
+        new(emodels, bvals, lmodel, num_levels, num_hidden_channels)
     end
 end
 
@@ -27,35 +29,26 @@ function Base.show(io::IO, policy::PolicyNL)
     println(io, s)
 end
 
-function eval_single(p::PolicyNL, ep, econn, epairs)
-    x = eval_single(p.emodels[1], ep, econn, epairs)
+function eval_single(p::PolicyNL, ep, epairs)
+    x = eval_single(p.emodels[1], ep, epairs, p.bvals)
     x = relu.(x)
 
     for i in 2:length(p.emodels)
-        y = eval_single(p.emodels[i], x, econn, epairs)
+        y = eval_single(p.emodels[i], x, epairs, p.bvals)
         y = x + y
         x = relu.(y)
     end
 
     logits = vec(p.lmodel(x))
-
     return logits
 end
 
-function eval_batch(p::PolicyNL, ep, econn, epairs)
-    x = eval_batch(p.emodels[1], ep, econn, epairs)
-    x = relu.(x)
-
-    for i in 2:length(p.emodels)
-        y = eval_batch(p.emodels[i], x, econn, epairs)
-        y = x + y
-        x = relu.(y)
-    end
-
-    nf, na, nb = size(x)
-    logits = reshape(p.lmodel(x), na, nb)
+function eval_batch(p::PolicyNL, ep, epairs)
+    nf, na, nb = size(ep)
+    ep = reshape(ep, nf, :)
+    logits = eval_single(p, ep, epairs)
+    logits = reshape(logits, na, nb)
     return logits
 end
-
 
 end

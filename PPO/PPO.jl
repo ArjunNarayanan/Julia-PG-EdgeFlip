@@ -146,11 +146,14 @@ function step_batch!(policy, optimizer, data, discount, epsilon)
 
     weights = params(policy)
 
+    loss = 0.0
     grads = Flux.gradient(weights) do 
         loss = ppo_loss(policy, state, a, old_action_probabilities, advantage, epsilon)
     end
 
     Flux.update!(optimizer, weights, grads)
+
+    return loss
 end
 
 
