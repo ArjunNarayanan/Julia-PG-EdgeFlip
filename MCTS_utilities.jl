@@ -123,9 +123,8 @@ end
 function TS.reset!(
     env::EdgeFlip.OrderedGameEnv;
     nflips = env.num_initial_flips,
-    maxflipfactor = 1.0,
+    maxflips = env.maxflips,
 )
-    maxflips = ceil(Int, maxflipfactor * nflips)
     EdgeFlip.reset!(env, nflips = nflips, maxflips = maxflips)
 end
 

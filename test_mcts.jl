@@ -2,7 +2,6 @@ using EdgeFlip
 include("MCTS_utilities.jl")
 include("policy_and_value_network.jl")
 # using PyPlot
-using Random
 
 TS = MCTS
 PV = PolicyAndValueNetwork
