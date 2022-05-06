@@ -2,7 +2,11 @@ using Flux
 using Distributions: Categorical
 using EdgeFlip
 include("PPO.jl")
-include("PPO_NL_policy.jl")
+
+# include("PPO_NL_policy.jl")
+
+include("simple_edge_policy.jl")
+Policy = SimplePolicy
 
 EF = EdgeFlip
 
@@ -53,8 +57,7 @@ function StateData(env)
 end
 
 function Base.length(s::StateData)
-    @assert length(s.edge_template_score) == length(s.edge_pairs)
-    return length(s.edge_template_score)
+    return last(size(s.edge_template_score))
 end
 
 function Base.show(io::IO, s::StateData)
@@ -90,12 +93,17 @@ function offset_edge_pairs(epairs)
     return offset_epairs
 end
 
-function PPO.batch_state(state_data)
+function PPO.episode_state(state_data)
     ets = cat(state_data.edge_template_score..., dims = 3)
-
     epairs = cat(state_data.edge_pairs..., dims = 2)
+
+    return StateData(ets, epairs)
+end
+
+function PPO.batch_state(vec_state_data)
+    ets = cat([state_data.edge_template_score for state_data in vec_state_data]..., dims = 3)
+    epairs = cat([state_data.edge_pairs for state_data in vec_state_data]..., dims = 2)
     batch_offset_edge_pairs!(epairs)
-    epairs = vec(epairs)
 
     return ets, epairs
 end
@@ -155,5 +163,5 @@ function average_normalized_returns(env, policy, num_trajectories)
         PPO.reset!(env)
         ret[idx] = single_trajectory_normalized_return(env, policy)
     end
-    return mean(ret), std(ret)
+    return Flux.mean(ret), Flux.std(ret)
 end

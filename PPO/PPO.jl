@@ -1,7 +1,9 @@
 module PPO
 
+using Printf
 using Distributions: Categorical
 using Flux
+using Random
 
 function state(env) end
 function reward(env) end
@@ -13,122 +15,143 @@ function initialize_state_data(env) end
 function update!(state_data, state) end
 function action_probabilities(policy, state) end
 function batch_action_probabilities(policy, state) end
+function episode_state(state_data) end
 function batch_state(state_data) end
 
-struct BatchData
-    state_data
-    action_probabilities
-    actions
-    rewards
-    terminal
-    function BatchData(state_data)
-        action_probabilities = Float64[]
-        actions = Int64[]
-        rewards = Float64[]
-        terminal = Bool[]
-        new(state_data, action_probabilities, actions, rewards, terminal)
-    end
+
+##############################################################################################################################
+
+struct EpisodeData
+    state_data::Any
+    selected_action_probabilities::Any
+    selected_actions::Any
+    rewards::Any
 end
 
-function actions(data::BatchData)
-    return data.actions
+function EpisodeData(state_data)
+    selected_action_probabilities = Float64[]
+    selected_actions = Int64[]
+    rewards = Float64[]
+    EpisodeData(state_data, selected_action_probabilities, selected_actions, rewards)
 end
 
-function rewards(data::BatchData)
+function selected_actions(data::EpisodeData)
+    return data.selected_actions
+end
+
+function rewards(data::EpisodeData)
     return data.rewards
 end
 
-function terminal(data::BatchData)
-    return data.terminal
+function selected_action_probabilities(data::EpisodeData)
+    return data.selected_action_probabilities
 end
 
-function action_probabilities(data::BatchData)
-    return data.action_probabilities
-end
-
-function state_data(data::BatchData)
+function state_data(data::EpisodeData)
     return data.state_data
 end
 
-function update!(batch_data::BatchData, state, action_probability, action, reward, terminal)
-    update!(batch_data.state_data, state)
-    push!(batch_data.action_probabilities, action_probability)
-    push!(batch_data.actions, action)
-    push!(batch_data.rewards, reward)
-    push!(batch_data.terminal, terminal)
+function update!(episode::EpisodeData, state, action_probability, action, reward)
+    update!(episode.state_data, state)
+    push!(episode.selected_action_probabilities, action_probability)
+    push!(episode.selected_actions, action)
+    push!(episode.rewards, reward)
     return
 end
 
-function Base.length(b::BatchData)
-    @assert length(b.action_probabilities) == length(b.actions) == length(b.rewards) == length(b.terminal)
-    return length(b.action_probabilities)
+function Base.length(b::EpisodeData)
+    @assert length(b.selected_action_probabilities) ==
+            length(b.selected_actions) ==
+            length(b.rewards)
+    return length(b.selected_action_probabilities)
 end
 
-function Base.show(io::IO, data::BatchData)
+function Base.show(io::IO, data::EpisodeData)
     nd = length(data)
-    println(io, "BatchData\n\t$nd data points")
+    println(io, "EpisodeData\n\t$nd data points")
 end
 
-function collect_step_data!(batch_data, env, policy)
+function collect_step_data!(episode_data, env, policy)
     s = state(env)
     ap = action_probabilities(policy, s)
     a = rand(Categorical(ap))
 
     step!(env, a)
     r = reward(env)
-    t = is_terminal(env)
 
-    update!(batch_data, s, ap[a], a, r, t)
+    update!(episode_data, s, ap[a], a, r)
 end
 
-function collect_sample_trajectory!(batch_data, env, policy)
+function collect_episode_data!(episode_data, env, policy)
     terminal = is_terminal(env)
 
     while !terminal
-        collect_step_data!(batch_data, env, policy)
+        collect_step_data!(episode_data, env, policy)
         terminal = is_terminal(env)
     end
 end
 
-function collect_batch_data!(batch_data, env, policy, memory_size)
-    while length(batch_data) < memory_size
+function batch_episode(episode::EpisodeData)
+    s = episode_state(state_data(episode))
+    return EpisodeData(
+        s,
+        selected_action_probabilities(episode),
+        selected_actions(episode),
+        rewards(episode),
+    )
+end
+##############################################################################################################################
+
+
+
+
+##############################################################################################################################
+struct BatchData
+    episodes::Any
+end
+
+function BatchData()
+    BatchData(EpisodeData[])
+end
+
+function Base.length(b::BatchData)
+    return length(b.episodes)
+end
+
+function Base.show(io::IO, batch_data::BatchData)
+    num_episodes = length(batch_data)
+    println(io, "BatchData\n\t$num_episodes episodes")
+end
+
+function Base.getindex(b::BatchData, idx)
+    return b.episodes[idx]
+end
+
+function Random.shuffle!(b::BatchData)
+    shuffle!(b.episodes)
+end
+
+function update!(b::BatchData, episode)
+    push!(b.episodes, episode)
+end
+
+function collect_batch_data!(batch_data, env, policy, num_episodes)
+    while length(batch_data) < num_episodes
         reset!(env)
-        collect_sample_trajectory!(batch_data, env, policy)
+        episode = EpisodeData(initialize_state_data(env))
+        collect_episode_data!(episode, env, policy)
+        episode = batch_episode(episode)
+        update!(batch_data, episode)
     end
-end
-
-function batch_returns(rewards, terminal, discount)
-    l = length(rewards)
-    @assert l == length(terminal)
-
-    values = zeros(l)
-    counter = 0
-    v = 0.0
-
-    for idx = l:-1:1
-        if terminal[idx]
-            counter = 0
-            v = 0.0
-        end
-        v = rewards[idx] + discount * v
-        values[idx] = v
-        counter += 1
-    end
-
-    return values
-end
-
-function batch_returns(data::BatchData, discount)
-    return batch_returns(data.rewards, data.terminal, discount)
 end
 
 function simplified_ppo_clip(epsilon, advantage)
-    return [a >= 0 ? (1+epsilon)*a : (1-epsilon)*a for a in advantage]
+    return [a >= 0 ? (1 + epsilon) * a : (1 - epsilon) * a for a in advantage]
 end
 
 function ppo_loss(policy, state, actions, old_action_probabilities, advantage, epsilon)
     ap = batch_action_probabilities(policy, state)
-    selected_ap = [ap[a,idx] for (idx,a) in enumerate(actions)]
+    selected_ap = [ap[a, idx] for (idx, a) in enumerate(actions)]
 
     ppo_gain = @. selected_ap / old_action_probabilities * advantage
     ppo_clip = simplified_ppo_clip(epsilon, advantage)
@@ -138,17 +161,52 @@ function ppo_loss(policy, state, actions, old_action_probabilities, advantage, e
     return loss
 end
 
-function step_batch!(policy, optimizer, data, discount, epsilon)
-    state = batch_state(state_data(data))
-    old_action_probabilities = action_probabilities(data)
-    advantage = batch_returns(data, discount)
-    a = actions(data)
+function batch_selected_action_probabilities(episodes)
+    return cat(selected_action_probabilities.(episodes)..., dims = 1)
+end
+
+function batch_returns(rewards, discount)
+    ne = length(rewards)
+
+    values = zeros(ne)
+    v = 0.0
+
+    for idx = ne:-1:1
+        v = rewards[idx] + discount * v
+        values[idx] = v
+    end
+
+    return values
+end
+
+function batch_advantage(episodes, discount)
+    episode_rewards = rewards.(episodes)
+    v = vcat([batch_returns(r, discount) for r in episode_rewards]...)
+    return v
+end
+
+function batch_selected_actions(episodes)
+    return cat(selected_actions.(episodes)..., dims = 1)
+end
+
+function step_batch!(policy, optimizer, episodes, discount, epsilon)
+    state = batch_state(state_data.(episodes))
+    old_action_probabilities = batch_selected_action_probabilities(episodes)
+    advantage = batch_advantage(episodes, discount)
+    sel_actions = batch_selected_actions(episodes)
 
     weights = params(policy)
 
     loss = 0.0
-    grads = Flux.gradient(weights) do 
-        loss = ppo_loss(policy, state, a, old_action_probabilities, advantage, epsilon)
+    grads = Flux.gradient(weights) do
+        loss = ppo_loss(
+            policy,
+            state,
+            sel_actions,
+            old_action_probabilities,
+            advantage,
+            epsilon,
+        )
     end
 
     Flux.update!(optimizer, weights, grads)
@@ -156,5 +214,61 @@ function step_batch!(policy, optimizer, data, discount, epsilon)
     return loss
 end
 
+function step_epoch!(policy, optimizer, batch_data, discount, epsilon, batch_size)
+    num_episodes = length(batch_data)
+    start = 1
+    loss = []
+    while start < num_episodes
+        stop = min(start + batch_size, num_episodes)
+        episodes = batch_data[start:stop]
+
+        l = step_batch!(policy, optimizer, episodes, discount, epsilon)
+        push!(loss, l)
+
+        start += batch_size
+    end
+    return Flux.mean(loss)
+end
+
+function ppo_train!(
+    policy,
+    optimizer,
+    batch_data,
+    discount,
+    epsilon,
+    batch_size,
+    num_epochs,
+)
+    for epoch = 1:num_epochs
+        shuffle!(batch_data)
+        l = step_epoch!(policy, optimizer, batch_data, discount, epsilon, batch_size)
+        @printf "EPOCH : %d \t AVG LOSS : %1.4f\n" epoch l
+    end
+end
+
+function ppo_iterate!(
+    policy,
+    env,
+    optimizer,
+    episodes_per_iteration,
+    discount,
+    epsilon,
+    batch_size,
+    num_epochs,
+    num_iter,
+    evaluator
+)
+    for iter in 1:num_iter
+        println("\nPPO ITERATION : $iter")
+
+        batch_data = BatchData()
+        collect_batch_data!(batch_data, env, policy, episodes_per_iteration)
+        ppo_train!(policy, optimizer, batch_data, discount, epsilon, batch_size, num_epochs)
+
+        ret, dev = evaluator(policy, env)
+
+        @printf "RET = %1.4f\tDEV = %1.4f\n" ret dev
+    end
+end
 
 end

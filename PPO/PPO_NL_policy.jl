@@ -46,6 +46,8 @@ end
 function eval_batch(p::PolicyNL, ep, epairs)
     nf, na, nb = size(ep)
     ep = reshape(ep, nf, :)
+    epairs = vec(epairs)
+
     logits = eval_single(p, ep, epairs)
     logits = reshape(logits, na, nb)
     return logits
