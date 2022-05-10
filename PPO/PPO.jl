@@ -138,10 +138,12 @@ end
 function collect_batch_data!(batch_data, env, policy, num_episodes)
     while length(batch_data) < num_episodes
         reset!(env)
-        episode = EpisodeData(initialize_state_data(env))
-        collect_episode_data!(episode, env, policy)
-        episode = batch_episode(episode)
-        update!(batch_data, episode)
+        if !is_terminal(env)
+            episode = EpisodeData(initialize_state_data(env))
+            collect_episode_data!(episode, env, policy)
+            episode = batch_episode(episode)
+            update!(batch_data, episode)
+        end
     end
 end
 
@@ -263,7 +265,13 @@ function ppo_iterate!(
 
         batch_data = BatchData()
         collect_batch_data!(batch_data, env, policy, episodes_per_iteration)
-        ppo_train!(policy, optimizer, batch_data, discount, epsilon, batch_size, num_epochs)
+
+        try
+            ppo_train!(policy, optimizer, batch_data, discount, epsilon, batch_size, num_epochs)
+        catch e
+            println("EXCEPTION OCCURRED")
+            return e, batch_data
+        end
 
         ret, dev = evaluator(policy, env)
 

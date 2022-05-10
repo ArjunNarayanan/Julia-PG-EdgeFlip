@@ -7,23 +7,27 @@ function evaluator(policy, env; num_trajectories = 100)
 end
 
 
-episodes_per_iteration = 100
+episodes_per_iteration = 500
 discount = 1.0
 epsilon = 0.2
-batch_size = 10
+batch_size = 50
 num_epochs = 10
 num_iter = 100
-# env = EF.OrderedGameEnv(1, 10, maxflips = 10)
-# policy = Policy.PolicyNL(2, 10)
+env = EF.OrderedGameEnv(1, 10, maxflips = 10)
+policy = Policy.PolicyNL(3, 16)
 
-learning_rate = 1e-3
-decay = 0.8
-decay_step = 50
-clip = 5e-5
-optimizer =
-    Flux.Optimiser(ExpDecay(learning_rate, decay, decay_step, clip), ADAM(learning_rate))
+# learning_rate = 1e-3
+# decay = 0.8
+# decay_step = 50
+# clip = 5e-5
+# optimizer =
+#     Flux.Optimiser(ExpDecay(learning_rate, decay, decay_step, clip), ADAM(learning_rate))
+optimizer = ADAM(1e-3)
 
-PPO.ppo_iterate!(
+new_data = PPO.BatchData()
+PPO.collect_batch_data!(new_data, env, policy, episodes_per_iteration)
+
+exception, data = PPO.ppo_iterate!(
     policy,
     env,
     optimizer,

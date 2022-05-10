@@ -3,10 +3,10 @@ using Distributions: Categorical
 using EdgeFlip
 include("PPO.jl")
 
-# include("PPO_NL_policy.jl")
+include("PPO_NL_policy.jl")
 
-include("simple_edge_policy.jl")
-Policy = SimplePolicy
+# include("simple_edge_policy.jl")
+# Policy = SimplePolicy
 
 EF = EdgeFlip
 
@@ -79,18 +79,21 @@ end
 function batch_offset_edge_pairs!(epairs)
     na, nb = size(epairs)
     zero_index = findall(epairs .== 0)
+    rows = [z[1] for z in zero_index]
+    epairs[zero_index] .= rows
 
     for (idx, col) in enumerate(eachcol(epairs))
         col .+= (idx - 1) * na
     end
 
-    epairs[zero_index] .= (na*nb + 1)
+    # epairs[zero_index] .= (na*nb + 1)
 end
 
-function offset_edge_pairs(epairs)
-    offset = length(epairs) + 1
-    offset_epairs = [p == 0 ? offset : p for p in epairs]
-    return offset_epairs
+function offset_edge_pairs!(epairs)
+    # offset = length(epairs) + 1
+    # offset_epairs = [p == 0 ? offset : p for p in epairs]
+    idx = findall(epairs .== 0)
+    epairs[idx] .= idx
 end
 
 function PPO.episode_state(state_data)
@@ -110,8 +113,9 @@ end
 
 function PPO.action_probabilities(policy, state)
     ets, epairs = state
-    epairs = offset_edge_pairs(epairs)
-    logits = Policy.eval_single(policy, ets, epairs)
+    pairs = copy(epairs)
+    epairs = offset_edge_pairs!(pairs)
+    logits = Policy.eval_single(policy, ets, pairs)
 
     p = softmax(logits)
 
