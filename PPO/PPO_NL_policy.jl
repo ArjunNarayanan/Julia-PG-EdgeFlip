@@ -1,7 +1,7 @@
 module Policy
 
 using Flux
-include("PPO_edge_model2.jl")
+include("PPO_edge_model.jl")
 
 
 struct PolicyNL

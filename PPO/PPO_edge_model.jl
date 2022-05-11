@@ -3,8 +3,12 @@ struct EdgeModel
     pmodel
     batchnorm
     function EdgeModel(in_channels, out_channels)
-        emodel = Dense(3in_channels, out_channels, relu)
-        pmodel = Dense(2out_channels, out_channels, relu)
+        # emodel = Chain(Dense(3in_channels, out_channels, relu),
+        #                Dense(out_channels, out_channels, relu))
+        # pmodel = Chain(Dense(2out_channels, out_channels, relu),
+        #                Dense(out_channels, out_channels))
+        emodel = Dense(3in_channels, out_channels)
+        pmodel = Dense(2out_channels, out_channels)
         batchnorm = BatchNorm(out_channels)
         new(emodel, pmodel, batchnorm)
     end

@@ -266,12 +266,7 @@ function ppo_iterate!(
         batch_data = BatchData()
         collect_batch_data!(batch_data, env, policy, episodes_per_iteration)
 
-        try
-            ppo_train!(policy, optimizer, batch_data, discount, epsilon, batch_size, num_epochs)
-        catch e
-            println("EXCEPTION OCCURRED")
-            return e, batch_data
-        end
+        ppo_train!(policy, optimizer, batch_data, discount, epsilon, batch_size, num_epochs)
 
         ret, dev = evaluator(policy, env)
 

@@ -3,7 +3,10 @@ using Distributions: Categorical
 using EdgeFlip
 include("PPO.jl")
 
-include("PPO_NL_policy.jl")
+include("PPO_direct_policy.jl")
+
+# include("PPO_NL_policy.jl")
+# include("PPO_NL_value.jl")
 
 # include("simple_edge_policy.jl")
 # Policy = SimplePolicy
@@ -11,10 +14,13 @@ include("PPO_NL_policy.jl")
 EF = EdgeFlip
 
 function PPO.state(env)
-    ets = copy(EF.edge_template_score(env))
+    # ets = copy(EF.edge_template_score(env))
+    ets = EF.edge_template_score(env)[[1],:]
+
     epairs = copy(EF.edge_pairs(env))
-    
-    return ets, epairs
+    normalized_remaining_flips = (env.maxflips - env.nbrflips)/EdgeFlip.number_of_actions(env)
+
+    return ets, epairs, normalized_remaining_flips
 end
 
 function PPO.is_terminal(env)
@@ -45,14 +51,17 @@ end
 struct StateData
     edge_template_score::Any
     edge_pairs::Any
+    remaining_flips
 end
 
 function StateData(env)
     edge_template_score = Matrix{Int}[]
     edge_pairs = Vector{Int}[]
+    remaining_flips = Float64[]
     StateData(
         edge_template_score,
         edge_pairs,
+        remaining_flips
     )
 end
 
@@ -67,9 +76,10 @@ function Base.show(io::IO, s::StateData)
 end
 
 function PPO.update!(state_data::StateData, state)
-    ets, epairs = state
+    ets, epairs, remaining_flips = state
     push!(state_data.edge_template_score, ets)
     push!(state_data.edge_pairs, epairs)
+    push!(state_data.remaining_flips, remaining_flips)
 end
 
 function PPO.initialize_state_data(env)
@@ -79,42 +89,48 @@ end
 function batch_offset_edge_pairs!(epairs)
     na, nb = size(epairs)
     zero_index = findall(epairs .== 0)
-    rows = [z[1] for z in zero_index]
-    epairs[zero_index] .= rows
 
     for (idx, col) in enumerate(eachcol(epairs))
         col .+= (idx - 1) * na
     end
 
-    # epairs[zero_index] .= (na*nb + 1)
+    # rows = [z[1] for z in zero_index]
+    # epairs[zero_index] .= rows
+
+    epairs[zero_index] .= (na*nb + 1)
 end
 
 function offset_edge_pairs!(epairs)
-    # offset = length(epairs) + 1
-    # offset_epairs = [p == 0 ? offset : p for p in epairs]
-    idx = findall(epairs .== 0)
-    epairs[idx] .= idx
+    offset = length(epairs) + 1
+    epairs[epairs .== 0] .= offset
+
+    # idx = findall(epairs .== 0)
+    # epairs[idx] .= idx
 end
 
 function PPO.episode_state(state_data)
     ets = cat(state_data.edge_template_score..., dims = 3)
     epairs = cat(state_data.edge_pairs..., dims = 2)
 
-    return StateData(ets, epairs)
+    return StateData(ets, epairs, state_data.remaining_flips)
 end
 
 function PPO.batch_state(vec_state_data)
     ets = cat([state_data.edge_template_score for state_data in vec_state_data]..., dims = 3)
+    
     epairs = cat([state_data.edge_pairs for state_data in vec_state_data]..., dims = 2)
     batch_offset_edge_pairs!(epairs)
 
-    return ets, epairs
+    nflips = cat([state_data.remaining_flips for state_data in vec_state_data]..., dims = 1)
+
+    return ets, epairs, nflips
 end
 
 function PPO.action_probabilities(policy, state)
-    ets, epairs = state
+    ets, epairs, nflips = state
     pairs = copy(epairs)
-    epairs = offset_edge_pairs!(pairs)
+
+    offset_edge_pairs!(pairs)
     logits = Policy.eval_single(policy, ets, pairs)
 
     p = softmax(logits)
@@ -123,7 +139,7 @@ function PPO.action_probabilities(policy, state)
 end
 
 function PPO.batch_action_probabilities(policy, state)
-    ets, epairs = state
+    ets, epairs, nflips = state
     logits = Policy.eval_batch(policy, ets, epairs)
 
     p = softmax(logits, dims = 1)
