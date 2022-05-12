@@ -6,6 +6,7 @@ struct DirectPolicy
     model
     bval1
     bval2
+    bval3
     hidden_channels
     num_hidden_layers
     function DirectPolicy(in_channels, hidden_channels, num_hidden_layers)
@@ -19,8 +20,9 @@ struct DirectPolicy
 
         bval1 = Flux.glorot_uniform(1)
         bval2 = Flux.glorot_uniform(2)
+        bval3 = Flux.glorot_uniform(4)
 
-        new(model, bval1, bval2, hidden_channels, num_hidden_layers)
+        new(model, bval1, bval2, bval3, hidden_channels, num_hidden_layers)
     end
 end
 
@@ -51,19 +53,21 @@ end
 function eval_single(m::DirectPolicy, x, pairs)
     cx = cycle_edges(x)
     
-    p = get_pairs(x, pairs, m.bval1)
-    cp = cycle_edges(p)
+    px = get_pairs(x, pairs, m.bval1)
+    cpx = cycle_edges(px)
 
-    x = cat(cx, cp, dims = 1)
-
-    y = x[[5,6], :]
+    y = cpx[[2,3], :]
     py = get_pairs(y, pairs, m.bval2)
+    cpy = cycle_edges(py)
 
-    x = cat(x, py, dims = 1)
+    z = cpy[3:6, :]
+    pz = get_pairs(z, pairs, m.bval3)
 
-    x = vec(m.model(x))
+    model_input = cat(cx, cpx, cpy, pz, dims = 1)
 
-    return x
+    model_output = vec(m.model(model_input))
+
+    return model_output
 end
 
 function eval_batch(m::DirectPolicy, x, pairs)

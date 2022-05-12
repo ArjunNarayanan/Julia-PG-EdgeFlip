@@ -19,8 +19,9 @@ function PPO.state(env)
 
     epairs = copy(EF.edge_pairs(env))
     normalized_remaining_flips = (env.maxflips - env.nbrflips)/EdgeFlip.number_of_actions(env)
+    remaining_score = EF.score(env) - EF.optimum_score(env)
 
-    return ets, epairs, normalized_remaining_flips
+    return ets, epairs, normalized_remaining_flips, remaining_score
 end
 
 function PPO.is_terminal(env)
@@ -52,16 +53,19 @@ struct StateData
     edge_template_score::Any
     edge_pairs::Any
     remaining_flips
+    remaining_score
 end
 
 function StateData(env)
     edge_template_score = Matrix{Int}[]
     edge_pairs = Vector{Int}[]
     remaining_flips = Float64[]
+    remaining_score = Int[]
     StateData(
         edge_template_score,
         edge_pairs,
-        remaining_flips
+        remaining_flips,
+        remaining_score
     )
 end
 
@@ -76,10 +80,15 @@ function Base.show(io::IO, s::StateData)
 end
 
 function PPO.update!(state_data::StateData, state)
-    ets, epairs, remaining_flips = state
+    ets, epairs, remaining_flips, remaining_score = state
     push!(state_data.edge_template_score, ets)
     push!(state_data.edge_pairs, epairs)
     push!(state_data.remaining_flips, remaining_flips)
+    push!(state_data.remaining_score, remaining_score)
+end
+
+function remaining_score(state_data::StateData)
+    return state_data.remaining_score
 end
 
 function PPO.initialize_state_data(env)
@@ -112,7 +121,7 @@ function PPO.episode_state(state_data)
     ets = cat(state_data.edge_template_score..., dims = 3)
     epairs = cat(state_data.edge_pairs..., dims = 2)
 
-    return StateData(ets, epairs, state_data.remaining_flips)
+    return StateData(ets, epairs, state_data.remaining_flips, state_data.remaining_score)
 end
 
 function PPO.batch_state(vec_state_data)
@@ -127,7 +136,7 @@ function PPO.batch_state(vec_state_data)
 end
 
 function PPO.action_probabilities(policy, state)
-    ets, epairs, nflips = state
+    ets, epairs, _, _ = state
     pairs = copy(epairs)
 
     offset_edge_pairs!(pairs)
@@ -138,8 +147,23 @@ function PPO.action_probabilities(policy, state)
     return p
 end
 
+function PPO.episode_returns(rewards, state_data, discount)
+    ne = length(rewards)
+
+    values = zeros(ne)
+    v = 0.0
+
+    for idx = ne:-1:1
+        v = rewards[idx] + discount * v
+        values[idx] = v
+    end
+
+    normalized_values = values ./ remaining_score(state_data)
+    return normalized_values
+end
+
 function PPO.batch_action_probabilities(policy, state)
-    ets, epairs, nflips = state
+    ets, epairs, _ = state
     logits = Policy.eval_batch(policy, ets, epairs)
 
     p = softmax(logits, dims = 1)

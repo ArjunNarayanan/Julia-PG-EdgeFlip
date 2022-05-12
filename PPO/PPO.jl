@@ -16,6 +16,7 @@ function update!(state_data, state) end
 function action_probabilities(policy, state) end
 function batch_action_probabilities(policy, state) end
 function episode_state(state_data) end
+function episode_returns(rewards, state_data, discount) end
 function batch_state(state_data) end
 
 
@@ -106,43 +107,43 @@ end
 
 
 ##############################################################################################################################
-struct BatchData
+struct Rollouts
     episodes::Any
 end
 
-function BatchData()
-    BatchData(EpisodeData[])
+function Rollouts()
+    Rollouts(EpisodeData[])
 end
 
-function Base.length(b::BatchData)
+function Base.length(b::Rollouts)
     return length(b.episodes)
 end
 
-function Base.show(io::IO, batch_data::BatchData)
+function Base.show(io::IO, batch_data::Rollouts)
     num_episodes = length(batch_data)
-    println(io, "BatchData\n\t$num_episodes episodes")
+    println(io, "Rollouts\n\t$num_episodes episodes")
 end
 
-function Base.getindex(b::BatchData, idx)
+function Base.getindex(b::Rollouts, idx)
     return b.episodes[idx]
 end
 
-function Random.shuffle!(b::BatchData)
+function Random.shuffle!(b::Rollouts)
     shuffle!(b.episodes)
 end
 
-function update!(b::BatchData, episode)
+function update!(b::Rollouts, episode)
     push!(b.episodes, episode)
 end
 
-function collect_batch_data!(batch_data, env, policy, num_episodes)
-    while length(batch_data) < num_episodes
+function collect_rollouts!(rollouts, env, policy, num_episodes)
+    while length(rollouts) < num_episodes
         reset!(env)
         if !is_terminal(env)
             episode = EpisodeData(initialize_state_data(env))
             collect_episode_data!(episode, env, policy)
             episode = batch_episode(episode)
-            update!(batch_data, episode)
+            update!(rollouts, episode)
         end
     end
 end
@@ -167,23 +168,9 @@ function batch_selected_action_probabilities(episodes)
     return cat(selected_action_probabilities.(episodes)..., dims = 1)
 end
 
-function batch_returns(rewards, discount)
-    ne = length(rewards)
-
-    values = zeros(ne)
-    v = 0.0
-
-    for idx = ne:-1:1
-        v = rewards[idx] + discount * v
-        values[idx] = v
-    end
-
-    return values
-end
-
 function batch_advantage(episodes, discount)
     episode_rewards = rewards.(episodes)
-    v = vcat([batch_returns(r, discount) for r in episode_rewards]...)
+    v = vcat([episode_returns(r, discount) for r in episode_rewards]...)
     return v
 end
 
@@ -263,10 +250,10 @@ function ppo_iterate!(
     for iter in 1:num_iter
         println("\nPPO ITERATION : $iter")
 
-        batch_data = BatchData()
-        collect_batch_data!(batch_data, env, policy, episodes_per_iteration)
+        rollouts = Rollouts()
+        collect_rollouts!(rollouts, env, policy, episodes_per_iteration)
 
-        ppo_train!(policy, optimizer, batch_data, discount, epsilon, batch_size, num_epochs)
+        ppo_train!(policy, optimizer, rollouts, discount, epsilon, batch_size, num_epochs)
 
         ret, dev = evaluator(policy, env)
 
