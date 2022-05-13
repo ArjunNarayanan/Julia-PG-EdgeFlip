@@ -7,26 +7,16 @@ function evaluator(policy, env; num_trajectories = 100)
 end
 
 
-episodes_per_iteration = 500
-discount = 0.9
+episodes_per_iteration = 1000
+discount = 1.0
 epsilon = 0.1
-batch_size = 50
-num_epochs = 10
-num_iter = 10
-env = EF.OrderedGameEnv(1, 10, maxflips = 10)
+batch_size = 200
+num_epochs = 5
+num_iter = 50
 
-policy = Policy.DirectPolicy(16, 32, 5)
+env = EF.OrderedGameEnv(2, 20, maxflips = 20)
+policy = Policy.DirectPolicy(16, 16, 3)
 # value = Value.ValueNL(3, 16)
-
-episode = PPO.EpisodeData(PPO.initialize_state_data(env))
-PPO.collect_episode_data!(episode, env, policy)
-
-
-
-# data = PPO.Rollouts()
-# PPO.collect_rollouts!(data, env, policy, episodes_per_iteration)
-
-
 
 # learning_rate = 1e-3
 # decay = 0.8
@@ -34,17 +24,18 @@ PPO.collect_episode_data!(episode, env, policy)
 # clip = 5e-5
 # optimizer =
 #     Flux.Optimiser(ExpDecay(learning_rate, decay, decay_step, clip), ADAM(learning_rate))
-# optimizer = ADAM(1e-3)
+optimizer = ADAM(1e-3)
 
-# PPO.ppo_iterate!(
-#     policy,
-#     env,
-#     optimizer,
-#     episodes_per_iteration,
-#     discount,
-#     epsilon,
-#     batch_size,
-#     num_epochs,
-#     num_iter,
-#     evaluator,
-# )
+PPO.ppo_iterate!(
+    policy,
+    env,
+    optimizer,
+    episodes_per_iteration,
+    discount,
+    epsilon,
+    batch_size,
+    num_epochs,
+    num_iter,
+    evaluator,
+)
+

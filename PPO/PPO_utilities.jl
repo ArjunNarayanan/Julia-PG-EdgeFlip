@@ -5,16 +5,9 @@ include("PPO.jl")
 
 include("PPO_direct_policy.jl")
 
-# include("PPO_NL_policy.jl")
-# include("PPO_NL_value.jl")
-
-# include("simple_edge_policy.jl")
-# Policy = SimplePolicy
-
 EF = EdgeFlip
 
 function PPO.state(env)
-    # ets = copy(EF.edge_template_score(env))
     ets = EF.edge_template_score(env)[[1],:]
 
     epairs = copy(EF.edge_pairs(env))
@@ -103,18 +96,12 @@ function batch_offset_edge_pairs!(epairs)
         col .+= (idx - 1) * na
     end
 
-    # rows = [z[1] for z in zero_index]
-    # epairs[zero_index] .= rows
-
     epairs[zero_index] .= (na*nb + 1)
 end
 
 function offset_edge_pairs!(epairs)
     offset = length(epairs) + 1
     epairs[epairs .== 0] .= offset
-
-    # idx = findall(epairs .== 0)
-    # epairs[idx] .= idx
 end
 
 function PPO.episode_state(state_data)
@@ -160,6 +147,14 @@ function PPO.episode_returns(rewards, state_data, discount)
 
     normalized_values = values ./ remaining_score(state_data)
     return normalized_values
+end
+
+function PPO.batch_advantage(episodes)
+    ret = PPO.rewards.(episodes)
+    # mean_ret = Flux.mean.(ret)
+    # adv = [ret[i] .- mean_ret[i] for i in 1:length(ret)]
+    v = vcat(ret...)
+    return v
 end
 
 function PPO.batch_action_probabilities(policy, state)

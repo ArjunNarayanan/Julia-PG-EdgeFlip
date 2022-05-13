@@ -18,6 +18,7 @@ function batch_action_probabilities(policy, state) end
 function episode_state(state_data) end
 function episode_returns(rewards, state_data, discount) end
 function batch_state(state_data) end
+function batch_advantage(episodes) end
 
 
 ##############################################################################################################################
@@ -92,13 +93,14 @@ function collect_episode_data!(episode_data, env, policy)
     end
 end
 
-function batch_episode(episode::EpisodeData)
+function batch_episode(episode::EpisodeData, discount)
     s = episode_state(state_data(episode))
+    r = episode_returns(rewards(episode), state_data(episode), discount)
     return EpisodeData(
         s,
         selected_action_probabilities(episode),
         selected_actions(episode),
-        rewards(episode),
+        r,
     )
 end
 ##############################################################################################################################
@@ -136,13 +138,14 @@ function update!(b::Rollouts, episode)
     push!(b.episodes, episode)
 end
 
-function collect_rollouts!(rollouts, env, policy, num_episodes)
+function collect_rollouts!(rollouts, env, policy, discount, num_episodes)
     while length(rollouts) < num_episodes
         reset!(env)
         if !is_terminal(env)
             episode = EpisodeData(initialize_state_data(env))
             collect_episode_data!(episode, env, policy)
-            episode = batch_episode(episode)
+            
+            episode = batch_episode(episode, discount)
             update!(rollouts, episode)
         end
     end
@@ -168,20 +171,14 @@ function batch_selected_action_probabilities(episodes)
     return cat(selected_action_probabilities.(episodes)..., dims = 1)
 end
 
-function batch_advantage(episodes, discount)
-    episode_rewards = rewards.(episodes)
-    v = vcat([episode_returns(r, discount) for r in episode_rewards]...)
-    return v
-end
-
 function batch_selected_actions(episodes)
     return cat(selected_actions.(episodes)..., dims = 1)
 end
 
-function step_batch!(policy, optimizer, episodes, discount, epsilon)
+function step_batch!(policy, optimizer, episodes, epsilon)
     state = batch_state(state_data.(episodes))
     old_action_probabilities = batch_selected_action_probabilities(episodes)
-    advantage = batch_advantage(episodes, discount)
+    advantage = batch_advantage(episodes)
     sel_actions = batch_selected_actions(episodes)
 
     weights = params(policy)
@@ -203,7 +200,7 @@ function step_batch!(policy, optimizer, episodes, discount, epsilon)
     return loss
 end
 
-function step_epoch!(policy, optimizer, batch_data, discount, epsilon, batch_size)
+function step_epoch!(policy, optimizer, batch_data, epsilon, batch_size)
     num_episodes = length(batch_data)
     start = 1
     loss = []
@@ -211,7 +208,7 @@ function step_epoch!(policy, optimizer, batch_data, discount, epsilon, batch_siz
         stop = min(start + batch_size, num_episodes)
         episodes = batch_data[start:stop]
 
-        l = step_batch!(policy, optimizer, episodes, discount, epsilon)
+        l = step_batch!(policy, optimizer, episodes, epsilon)
         push!(loss, l)
 
         start += batch_size
@@ -223,14 +220,13 @@ function ppo_train!(
     policy,
     optimizer,
     batch_data,
-    discount,
     epsilon,
     batch_size,
     num_epochs,
 )
     for epoch = 1:num_epochs
         shuffle!(batch_data)
-        l = step_epoch!(policy, optimizer, batch_data, discount, epsilon, batch_size)
+        l = step_epoch!(policy, optimizer, batch_data, epsilon, batch_size)
         @printf "EPOCH : %d \t AVG LOSS : %1.4f\n" epoch l
     end
 end
@@ -251,9 +247,9 @@ function ppo_iterate!(
         println("\nPPO ITERATION : $iter")
 
         rollouts = Rollouts()
-        collect_rollouts!(rollouts, env, policy, episodes_per_iteration)
+        collect_rollouts!(rollouts, env, policy, discount, episodes_per_iteration)
 
-        ppo_train!(policy, optimizer, rollouts, discount, epsilon, batch_size, num_epochs)
+        ppo_train!(policy, optimizer, rollouts, epsilon, batch_size, num_epochs)
 
         ret, dev = evaluator(policy, env)
 
