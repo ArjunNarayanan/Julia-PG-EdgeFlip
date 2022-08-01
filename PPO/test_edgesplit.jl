@@ -51,7 +51,7 @@ episodes_per_iteration = 1000
 num_epochs = 5
 num_iter = 50
 
-wrapper = initialize_environment(nref, num_random_flips, max_actions)
+
 # wrapper = initialize_hex_environment(3)
 policy = SplitPolicy.Policy(24, 32, 3)
 optimizer = ADAM(1e-3)
