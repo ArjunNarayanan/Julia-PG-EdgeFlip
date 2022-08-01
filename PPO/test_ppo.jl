@@ -18,13 +18,13 @@ env = EF.OrderedGameEnv(2, 20, maxflips = 20)
 policy = Policy.DirectPolicy(16, 16, 3)
 # value = Value.ValueNL(3, 16)
 
-# learning_rate = 1e-3
+learning_rate = 1e-3
 # decay = 0.8
 # decay_step = 50
 # clip = 5e-5
 # optimizer =
-#     Flux.Optimiser(ExpDecay(learning_rate, decay, decay_step, clip), ADAM(learning_rate))
-optimizer = ADAM(1e-3)
+# Flux.Optimiser(ExpDecay(learning_rate, decay, decay_step, clip), ADAM(learning_rate))
+optimizer = ADAM(learning_rate)
 
 PPO.ppo_iterate!(
     policy,

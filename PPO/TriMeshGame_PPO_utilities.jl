@@ -9,9 +9,9 @@ TM = TriMeshGame
 
 mutable struct GameEnvWrapper
     mesh0::Any
-    desired_degree
+    desired_degree::Any
     nflips::Any
-    max_actions
+    max_actions::Any
     env::Any
     function GameEnvWrapper(mesh0, desired_degree, nflips, max_actions)
         mesh = deepcopy(mesh0)
@@ -56,11 +56,18 @@ function PPO.reward(wrapper)
     return env.reward
 end
 
+function only_flip_index_to_action(index)
+    triangle, vertex = div(index - 1, 3) + 1, (index - 1) % 3 + 1
+    return triangle, vertex
+end
+
 function index_to_action(index)
     triangle = div(index - 1, 6) + 1
-    vertex = rem(index - 1, 3) + 1
+
     pos = rem(index - 1, 6)
-    type = div(pos, 3) + 1
+    
+    vertex = div(pos, 2) + 1
+    type = rem(pos, 2) + 1
 
     return triangle, vertex, type
 end
@@ -74,8 +81,12 @@ function PPO.step!(wrapper, action_index; no_action_reward = -4)
     na = action_space_size(env)
     @assert 0 < action_index <= na "Expected 0 < action_index <= $na, got action_index = $action_index"
     @assert !env.is_terminated "Attempting to step in terminated environment with action $action_index"
+
     triangle, vertex, type = index_to_action(action_index)
     TM.step!(env, triangle, vertex, type, no_action_reward = no_action_reward)
+
+    # triangle, vertex = only_flip_index_to_action(action_index)
+    # TM.step_flip!(env, triangle, vertex, no_action_reward)
 end
 
 struct StateData
@@ -147,7 +158,7 @@ end
 
 function negative_inf_mask(nrows, maxcols, maskcols)
     mask = zeros(Float32, nrows, maxcols)
-    mask[:,maskcols+1:end] .= -Inf
+    mask[:, maskcols+1:end] .= -Inf
     return mask
 end
 
@@ -169,7 +180,7 @@ function PPO.batch_action_probabilities(policy, state)
     scores, mask = state
     logits = policy(scores) + mask
     nf, na, nb = size(logits)
-    logits = reshape(logits, nf*na, nb)
+    logits = reshape(logits, nf * na, nb)
     p = softmax(logits, dims = 1)
     return p
 end
@@ -203,7 +214,7 @@ function single_trajectory_normalized_return(wrapper, policy)
         return 1.0
     else
         ret = single_trajectory_return(wrapper, policy)
-        return ret/maxreturn
+        return ret / maxreturn
     end
 end
 
