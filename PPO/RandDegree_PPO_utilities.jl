@@ -65,7 +65,6 @@ function index_to_action(index)
     triangle = div(index - 1, 6) + 1
 
     pos = rem(index - 1, 6)
-
     vertex = div(pos, 2) + 1
     type = rem(pos, 2) + 1
 
