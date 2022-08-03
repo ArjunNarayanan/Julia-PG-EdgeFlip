@@ -1,27 +1,10 @@
 using TriMeshGame
+include("random_polygon_generator.jl")
 include("RandDegree_PPO_utilities.jl")
 using MeshPlotter
 
 TM = TriMeshGame
 MP = MeshPlotter
-
-function hex_mesh()
-    d = range(0,stop=2pi,length=7)[1:end-1]
-    p = [cos.(d) sin.(d)]
-    t = [1 2 6
-         2 5 6
-         2 3 5
-         3 4 5]
-    mesh = TM.Mesh(p, t)
-    return mesh
-end
-
-function initialize_hex_environment(degree_range,max_actions)
-    mesh = hex_mesh()
-    wrapper = GameEnvWrapper(mesh, degree_range, max_actions)
-    return wrapper
-end
-
 
 function active_mesh(mesh)
     p = mesh.p
@@ -36,6 +19,12 @@ end
 
 
 degree_range = [2,3,4]
+
+dd = rand(degree_range,5)
+angles = valence2degrees.(dd)
+sum_angles = sum(angles)
+remaining_angle = 720 - sum_angles
+
 max_actions = 10
 
 discount = 0.95
@@ -70,20 +59,20 @@ PPO.ppo_iterate!(
 # using BSON: @load
 # @load "results\\random-degree\\rand-degree-policy.bson" policy
 
-evaluator(policy, wrapper)
+# evaluator(policy, wrapper)
 
 # average_number_of_splits(wrapper,policy,100)
 
-PPO.reset!(wrapper)
-MP.plot_mesh(wrapper.env.mesh,d0=wrapper.desired_degree)[1]
+# PPO.reset!(wrapper)
+# MP.plot_mesh(wrapper.env.mesh,d0=wrapper.desired_degree)[1]
 
-w0 = deepcopy(wrapper)
+# w0 = deepcopy(wrapper)
 
-MP.plot_mesh(w0.env.mesh,d0=w0.desired_degree)[1]
+# MP.plot_mesh(w0.env.mesh,d0=w0.desired_degree)[1]
 
-single_trajectory_normalized_return(wrapper,policy)
+# single_trajectory_normalized_return(wrapper,policy)
 
-act_mesh = active_mesh(wrapper.env.mesh)
-MP.plot_mesh(act_mesh,d0=wrapper.desired_degree)[1]
+# act_mesh = active_mesh(wrapper.env.mesh)
+# MP.plot_mesh(act_mesh,d0=wrapper.desired_degree)[1]
 
 # valid_splits, invalid_splits = average_number_of_splits(wrapper, policy, 100)
