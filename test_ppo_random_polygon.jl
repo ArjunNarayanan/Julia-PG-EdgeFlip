@@ -35,7 +35,7 @@ num_epochs = 5
 num_iter = 50
 
 wrapper = initialize_hex_environment(degree_range,20)
-# policy = SplitPolicy.Policy(24, 32, 5)
+policy = SplitPolicy.Policy(24, 32, 5)
 optimizer = ADAM(1e-3)
 
 # MP.plot_mesh(wrapper.env.mesh, d0=wrapper.desired_degree)[1]

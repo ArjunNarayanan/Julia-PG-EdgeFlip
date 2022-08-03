@@ -17,7 +17,7 @@ Unstructured meshing of polygonal regions.
         p,t = polytrimesh([pv1,pv2], holes, hmaxfcn)
         trimesh(p[1,:], p[2,:], t, aspect_ratio=:equal)
 """
-function polytrimesh(pvs, holes=zeros(2,0), hmax=Inf, cmd="puq28.6Q")
+function polytrimesh(pvs; holes=zeros(2,0), hmax=Inf, cmd="puq28.6Q")
   pv = Matrix{Float64}[]
   seg = Matrix{Int32}[]
   nseg = 0
@@ -74,7 +74,7 @@ function samplemesh1()
   pv2 = hcat([.2,.2], [.4,.2], [.4,.4], [.39,.4], [.2,.4], [.2,.2])
   holes = [.3,.3]
   hmaxfcn = (x,y) -> 0.01 + 0.3*abs(sqrt((x-.5)^2+(y-.5)^2))
-  p,t = polytrimesh([pv1,pv2], holes, hmaxfcn)
+  p,t = polytrimesh([pv1,pv2], holes=holes, hmax=hmaxfcn)
   p,t
 end
 
@@ -82,14 +82,14 @@ function circlemesh(hmax)
   n = ceil(Int, 2π / hmax)
   θ = 2π*(0:n)'./n
   pv = vcat(cos.(θ), sin.(θ))
-  p,t = polytrimesh([pv], [], hmax, "puYQ")
+  p,t = polytrimesh([pv], holes=[], hmax=hmax, cmd="puYQ")
   p = Array(transpose(p))
   t = Array(transpose(t))
   return p, t
 end
 
-#p,t = samplemesh1()
-#trimesh(p[1,:], p[2,:], t, aspect_ratio=:equal)
+# p,t = samplemesh1()
+# trimesh(p[1,:], p[2,:], t, aspect_ratio=:equal)
 
 # p,t = circlemesh(0.4)
 # trimesh(p[1,:], p[2,:], t, aspect_ratio=:equal)

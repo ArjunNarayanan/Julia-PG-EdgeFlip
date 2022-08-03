@@ -1,4 +1,5 @@
 using LinearAlgebra
+include("../tri.jl")
 
 function random_coordinates(n;threshold = 0.2)
     d = range(0,stop=2pi,length=n+1)[1:n]
@@ -13,11 +14,12 @@ function enclosed_angle(v1,v2)
     @assert length(v1) == length(v2) == 2
     dotp = dot(v1,v2)
     detp = v1[1]*v2[2] - v1[2]*v2[1]
-    angle = rad2deg(atan(detp, dotp))
-    if angle < 0
-        angle = 360+angle
+    rad = atan(detp, dotp)
+    if rad < 0
+        rad += 2pi
     end
-    return angle 
+
+    return rad2deg(rad) 
 end
 
 function polygon_interior_angles(p)
