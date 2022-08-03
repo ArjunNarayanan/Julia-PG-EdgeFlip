@@ -1,7 +1,7 @@
 using LinearAlgebra
-include("../tri.jl")
+include("tri.jl")
 
-function random_coordinates(n;threshold = 0.2)
+function random_coordinates(n;threshold = 0.1)
     d = range(0,stop=2pi,length=n+1)[1:n]
     r = (1-threshold)*rand(n) .+ threshold
 
@@ -37,17 +37,13 @@ function polygon_interior_angles(p)
 end
 
 function desired_valence(angle)
-    v1 = floor(angle/60)
-    v2 = ceil(angle/60)
-
-    e1 = abs(angle - v1*60)
-    e2 = abs(angle - v2*60)
-
-    if e1 < e2
-        return round(Int,v1) + 1
-    else
-        return round(Int,v2) + 1
+    ndiv = 1
+    err = abs(angle - 60)
+    while err > abs(angle/(ndiv+1) - 60)
+        ndiv += 1
+        err = abs(angle/ndiv - 60) 
     end
+    return ndiv+1
 end
 
 function hex_mesh()
