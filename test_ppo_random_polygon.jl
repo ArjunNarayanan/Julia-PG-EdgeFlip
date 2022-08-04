@@ -1,6 +1,5 @@
 using TriMeshGame
-include("random_polygon_generator.jl")
-include("RandDegree_PPO_utilities.jl")
+include("PPO/RandPoly_PPO_utilities.jl")
 using MeshPlotter
 
 TM = TriMeshGame
@@ -17,62 +16,101 @@ function evaluator(policy, wrapper; num_trajectories = 100)
     return ret, dev
 end
 
+function returns_vs_maxflips(policy, polyorder, max_actions; threshold = 0.1)
+    wrapper = GameEnvWrapper(polyorder, threshold, max_actions)
+    ret, dev = evaluator(policy, wrapper; num_trajectories = 1000)
+    return ret, dev
+end
 
-degree_range = [2,3,4]
 
-dd = rand(degree_range,5)
-angles = valence2degrees.(dd)
-sum_angles = sum(angles)
-remaining_angle = 720 - sum_angles
 
-max_actions = 10
+polyorder = 10
+threshold = 0.2
+max_actions = 20
 
 discount = 0.95
 epsilon = 0.1
 batch_size = 200
 episodes_per_iteration = 1000
 num_epochs = 5
-num_iter = 50
+num_iter = 400
 
-wrapper = initialize_hex_environment(degree_range,20)
-policy = SplitPolicy.Policy(24, 32, 5)
-optimizer = ADAM(1e-3)
+# wrapper = GameEnvWrapper(polyorder, threshold, max_actions)
+# policy = SplitPolicy.Policy(24, 32, 5)
+# optimizer = ADAM(1e-3)
 
 # MP.plot_mesh(wrapper.env.mesh, d0=wrapper.desired_degree)[1]
 
-PPO.ppo_iterate!(
-    policy,
-    wrapper,
-    optimizer,
-    episodes_per_iteration,
-    discount,
-    epsilon,
-    batch_size,
-    num_epochs,
-    num_iter,
-    evaluator,
-)
+
+
+# PPO.ppo_iterate!(
+#     policy,
+#     wrapper,
+#     optimizer,
+#     episodes_per_iteration,
+#     discount,
+#     epsilon,
+#     batch_size,
+#     num_epochs,
+#     num_iter,
+#     evaluator,
+# )
+
+# function plot_returns(maxflips, ret, dev; filename = "", ylim = (0.0, 1.0))
+#     fig, ax = subplots()
+#     ax.plot(maxflips, ret)
+#     ax.fill_between(maxflips, ret + dev/2, ret - dev/2, alpha = 0.2, facecolor = "blue")
+#     ax.set_xlabel("Maximum allowed actions")
+#     ax.set_ylabel("Normalized returns")
+#     ax.set_ylim(ylim)
+#     if length(filename) > 0
+#         fig.savefig(filename)
+#     end
+#     return fig
+# end
+
+
+# using PyPlot
+
+# polyorder = 30
+# max_actions_range = 0:50
+# stats = [returns_vs_maxflips(policy, polyorder, ma) for ma in max_actions_range]
+# ret = [first(s) for s in stats]
+# dev = [last(s) for s in stats]
+
+# filename = "results/ppo-random-polygon/figures/performance-"*string(polyorder)*".png"
+# fig = plot_returns(max_actions_range, ret, dev, filename = filename)
+
+
+
+
+
 
 # using BSON: @save
-# @save "results\\random-degree\\rand-degree-policy.bson" policy
+# @save "results/ppo-random-polygon/poly10-policy.bson" policy
 
 # using BSON: @load
 # @load "results\\random-degree\\rand-degree-policy.bson" policy
 
-# evaluator(policy, wrapper)
+# polyorder = 10
+# wrapper = GameEnvWrapper(polyorder, 0.2, 30)
 
-# average_number_of_splits(wrapper,policy,100)
+# counter = 0
 
 # PPO.reset!(wrapper)
-# MP.plot_mesh(wrapper.env.mesh,d0=wrapper.desired_degree)[1]
 
-# w0 = deepcopy(wrapper)
+# fig, ax = MP.plot_mesh(wrapper.mesh0,d0=wrapper.desired_degree)
+# fig
+# counter += 1
+# filename = "results/ppo-random-polygon/figures/initial-"*string(counter)*".png"
+# fig.savefig(filename)
 
-# MP.plot_mesh(w0.env.mesh,d0=w0.desired_degree)[1]
-
-# single_trajectory_normalized_return(wrapper,policy)
+# initial_reset!(wrapper)
+# s = best_policy_mesh!(wrapper, policy)
 
 # act_mesh = active_mesh(wrapper.env.mesh)
-# MP.plot_mesh(act_mesh,d0=wrapper.desired_degree)[1]
-
+# fig, ax = MP.plot_mesh(act_mesh,d0=wrapper.env.d0)
+# fig
+# filename = "results/ppo-random-polygon/figures/improved-"*string(counter)*".png"
+# fig.savefig(filename)
 # valid_splits, invalid_splits = average_number_of_splits(wrapper, policy, 100)
