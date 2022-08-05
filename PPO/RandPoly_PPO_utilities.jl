@@ -41,6 +41,10 @@ function val_or_zero(vector, template)
     return [t == 0 ? 0 : vector[t] for t in template]
 end
 
+function val_or_missing(vector, template, missing_val)
+    return [t == 0 ? missing_val : vector[t] for t in template]
+end
+
 function initial_reset!(wrapper::GameEnvWrapper)
     # wrapper.desired_degree = desired_valence.(polygon_interior_angles(wrapper.mesh0.p))
     wrapper.env = TM.GameEnv(wrapper.mesh0, wrapper.desired_degree, wrapper.max_actions)
@@ -55,10 +59,13 @@ end
 function PPO.state(wrapper)
     env = wrapper.env
 
-    vs = val_or_zero(env.vertex_score, env.template)
-    v0 = val_or_zero(env.d0, env.template)
+    # vs = val_or_zero(env.vertex_score, env.template)
+    # vd = val_or_zero(env.mesh.d, env.template)
+    # v0 = val_or_zero(env.d0, env.template)
+    vs = val_or_missing(env.vertex_score, env.template, 10)
 
-    return vcat(vs, v0)
+    return vs
+    # return vcat(vs, vd, v0)
 end
 
 function PPO.reset!(wrapper)
@@ -256,6 +263,25 @@ function average_normalized_returns(wrapper, policy, num_trajectories)
     for idx = 1:num_trajectories
         PPO.reset!(wrapper)
         ret[idx] = single_trajectory_normalized_return(wrapper, policy)
+    end
+    return Flux.mean(ret), Flux.std(ret)
+end
+
+function best_normalized_returns(wrapper, policy, num_attempts)
+    maxret = -Inf
+    for idx = 1:num_attempts
+        initial_reset!(wrapper)
+        ret = single_trajectory_normalized_return(wrapper, policy)
+        maxret = max(maxret, ret)
+    end
+    return maxret
+end
+
+function average_best_normalized_returns(wrapper, policy, num_attempts, num_trajectories)
+    ret = zeros(num_trajectories)
+    for idx = 1:num_trajectories
+        PPO.reset!(wrapper)
+        ret[idx] = best_normalized_returns(wrapper, policy, num_attempts)
     end
     return Flux.mean(ret), Flux.std(ret)
 end
